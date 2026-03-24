@@ -1,0 +1,29 @@
+{
+  "name": "@stylusnexus/skill-loop-claude",
+  "version": "0.1.0",
+  "description": "Claude Code adapter for skill-loop (PreToolUse/PostToolUse hooks)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "skill-loop-claude": "dist/cli.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@stylusnexus/skill-loop": "workspace:*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stylusnexus/skill-loop.git",
+    "directory": "packages/adapter-claude"
+  },
+  "devDependencies": {
+    "vitest": "^3.1.0"
+  }
+}

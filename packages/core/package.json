@@ -1,0 +1,33 @@
+{
+  "name": "@stylusnexus/skill-loop",
+  "version": "0.1.0",
+  "description": "Core engine for self-improving AI coding tool skills",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "ai",
+    "skills",
+    "claude-code",
+    "codex",
+    "copilot",
+    "self-improving",
+    "telemetry",
+    "observability"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stylusnexus/skill-loop.git",
+    "directory": "packages/core"
+  },
+  "devDependencies": {
+    "vitest": "^3.1.0"
+  }
+}

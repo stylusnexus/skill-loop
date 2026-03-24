@@ -1,0 +1,27 @@
+{
+  "name": "@stylusnexus/skill-loop-cli",
+  "version": "0.1.0",
+  "description": "CLI for skill-loop: inspect, amend, evaluate, and maintain AI coding tool skills",
+  "bin": {
+    "skill-loop": "dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@stylusnexus/skill-loop": "workspace:*"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stylusnexus/skill-loop.git",
+    "directory": "packages/cli"
+  },
+  "devDependencies": {
+    "vitest": "^3.1.0"
+  }
+}

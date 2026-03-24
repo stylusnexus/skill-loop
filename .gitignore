@@ -1,0 +1,21 @@
+node_modules/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Skill telemetry (the product's own output)
+.skill-telemetry/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
