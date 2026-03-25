@@ -148,18 +148,46 @@ export interface SkillPattern {
 
 // ─── External Sync ────────────────────────────────────────────────
 
+/**
+ * Sync plugins receive data AFTER core-level sanitization.
+ * Sensitive fields (taskContext, errorDetail) are redacted by the core
+ * before reaching the plugin. Plugins cannot access raw sensitive data
+ * unless the user explicitly opts in via sync.allowSensitiveFields config.
+ */
 export interface SyncPlugin {
   name: string;
   version: string;
-  filter(run: SkillRun): boolean;
-  sanitize(run: SkillRun): SyncPayload;
+  /** Declare which events this plugin wants. Called before emit. */
+  filter(run: SanitizedSkillRun): boolean;
+  /** Emit a sync event. Must not throw — errors are swallowed and logged locally. */
   emit(event: SyncEvent): Promise<void>;
+}
+
+/**
+ * A SkillRun with sensitive fields stripped by the core.
+ * This is what plugins receive — never the raw SkillRun.
+ */
+export interface SanitizedSkillRun {
+  id: string;
+  skillId: string;
+  skillVersion: number;
+  timestamp: string;
+  platform: Platform;
+  /** Redacted to "[redacted]" unless sync.allowSensitiveFields is true */
+  taskContext: string;
+  taskTags: string[];
+  outcome: RunOutcome;
+  errorType?: ErrorType;
+  /** Redacted to "[redacted]" unless sync.allowSensitiveFields is true */
+  errorDetail?: string;
+  durationMs: number;
+  amendmentId?: string;
 }
 
 export type SyncPayload = Record<string, unknown>;
 
 export type SyncEvent =
-  | { type: 'run_completed'; payload: SyncPayload }
+  | { type: 'run_completed'; payload: SanitizedSkillRun }
   | { type: 'amendment_proposed'; payload: SyncPayload }
   | { type: 'amendment_evaluated'; payload: SyncPayload }
   | { type: 'registry_updated'; payload: SyncPayload };
@@ -183,5 +211,7 @@ export interface SkillLoopConfig {
   };
   sync: {
     plugins: string[];
+    /** If true, taskContext and errorDetail are sent to sync plugins. Default: false (redacted). */
+    allowSensitiveFields: boolean;
   };
 }

@@ -19,6 +19,7 @@ export const DEFAULT_CONFIG: SkillLoopConfig = {
   },
   sync: {
     plugins: [],
+    allowSensitiveFields: false,
   },
 };
 

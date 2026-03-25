@@ -12,3 +12,4 @@ export { Evaluator } from './evaluator.js';
 export type { EvaluationResult } from './evaluator.js';
 export { createUnifiedDiff } from './diff.js';
 export * from './git.js';
+export { sanitizeRunForSync } from './sanitizer.js';

@@ -290,16 +290,36 @@ When using the MCP server, your AI tool's permission system governs whether `ski
 - **Cursor/Windsurf**: Uses their built-in tool approval flow
 - **`--dry-run`**: Always available to preview proposals without any file changes
 
-### Sync plugins (Phase 4, not yet implemented)
+### Sync plugins and data privacy
 
-Future sync plugins may send run data to external services (PostHog, etc.). When this is implemented:
+Future sync plugins may send run data to external services (PostHog, etc.). The core enforces privacy at the code level — this is not left to plugin authors:
 
-- Sync is **opt-in** — disabled by default, requires explicit configuration
-- Each plugin owns its own `filter()` (what data to send) and `sanitize()` (PII scrubbing)
+**Sensitive fields are redacted by the core before plugins ever see them:**
+
+| Field | Contains | Default | How to allow |
+|-------|----------|---------|--------------|
+| `taskContext` | What the user was doing | `[redacted]` | `sync.allowSensitiveFields: true` |
+| `errorDetail` | Error messages from skill failures | `[redacted]` | `sync.allowSensitiveFields: true` |
+
+The core's `sanitizeRunForSync()` function strips these fields before passing data to any plugin. Plugins receive a `SanitizedSkillRun` type — they physically cannot access the raw data unless you opt in.
+
+To explicitly allow sensitive fields (e.g., for a private PostHog instance):
+
+```json
+{
+  "sync": {
+    "plugins": ["posthog"],
+    "allowSensitiveFields": true
+  }
+}
+```
+
+**Additional safeguards:**
+
+- Sync is **opt-in** — disabled by default, no plugins configured
 - The core engine never touches the network — only plugins do
 - Sync is fire-and-forget and never blocks the local feedback loop
-
-**Recommendation:** Review any sync plugin's `filter` and `sanitize` implementations before enabling it. Run data may contain task context strings (what the user was doing) and error details that could be sensitive.
+- Non-sensitive fields (skill ID, outcome, duration, platform, tags) are always available to plugins — these are sufficient for most analytics
 
 ### Git safety
 
