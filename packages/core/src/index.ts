@@ -18,3 +18,5 @@ export { gc } from './gc.js';
 export type { GcResult } from './gc.js';
 export { loadPlugins } from './plugin-loader.js';
 export type { PluginLoadResult } from './plugin-loader.js';
+export { DetectionPipeline, scoreDetection, listSessions, computeDetectionStats, dryRunDetect } from './detector.js';
+export type { PreEvent, PostEvent, DetectionStats } from './detector.js';

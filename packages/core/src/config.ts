@@ -21,6 +21,19 @@ export const DEFAULT_CONFIG: SkillLoopConfig = {
     plugins: [],
     allowSensitiveFields: false,
   },
+  detection: {
+    enabled: true,
+    confidenceThreshold: 0.6,
+    sessionWindowMs: 300_000,
+    confidenceWeights: {
+      explicit: 1.0,
+      read_skill_file: 0.9,
+      tool_fingerprint: 0.6,
+      file_overlap: 0.5,
+    },
+    enabledMethods: ['explicit', 'read_skill_file', 'tool_fingerprint'],
+    logBelowThreshold: false,
+  },
   parser: {
     excludePatterns: [],
     excludePatternsOverride: false,

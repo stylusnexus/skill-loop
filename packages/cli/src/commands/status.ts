@@ -1,5 +1,5 @@
-import { loadConfig, readJson, TelemetryWriter } from '@stylusnexus/skill-loop';
-import type { SkillRegistry, RunsIndex } from '@stylusnexus/skill-loop';
+import { loadConfig, readJson, TelemetryWriter, computeDetectionStats } from '@stylusnexus/skill-loop';
+import type { SkillRegistry, SkillRun, RunsIndex } from '@stylusnexus/skill-loop';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -52,6 +52,17 @@ export async function statusCommand(projectRoot: string): Promise<void> {
   if (failures > 0 && runCount > 0) {
     const failRate = ((failures / runCount) * 100).toFixed(1);
     console.log(`\nOverall failure rate: ${failRate}%`);
+  }
+
+  if (runCount > 0) {
+    const allRuns = await writer.getAllRuns();
+    const stats = computeDetectionStats(allRuns);
+    console.log('\nDetection methods:');
+    if (stats.explicit > 0) console.log(`  Explicit (Skill tool): ${stats.explicit}`);
+    if (stats.read_skill_file > 0) console.log(`  SKILL.md read:        ${stats.read_skill_file}`);
+    if (stats.tool_fingerprint > 0) console.log(`  Tool fingerprint:     ${stats.tool_fingerprint}`);
+    if (stats.file_overlap > 0) console.log(`  File overlap:         ${stats.file_overlap}`);
+    if (stats.untracked > 0) console.log(`  Legacy (pre-detect):  ${stats.untracked}`);
   }
 }
 
