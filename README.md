@@ -31,27 +31,18 @@ SKILL --> RUN --> OBSERVE --> INSPECT --> FIX
 
 ## Install
 
-### Option 1: MCP Server (recommended)
+### Option 1: MCP Server (recommended — set it and forget it)
 
-The MCP server lets any MCP-compatible AI tool (Claude Code, Cursor, Windsurf, Codex) interact with skill-loop directly. The agent can check skill health, log runs, and query failures without you running CLI commands.
+Add one block to your MCP config. That's the only setup.
 
-```bash
-npm install @stylusnexus/skill-loop @stylusnexus/skill-loop-mcp
-```
-
-Add to your MCP configuration:
-
-**Claude Code** (`.claude/settings.json` or project `.mcp.json`):
+**Claude Code** (`.mcp.json` in your project root):
 
 ```json
 {
   "mcpServers": {
     "skill-loop": {
       "command": "npx",
-      "args": ["skill-loop-mcp"],
-      "env": {
-        "SKILL_LOOP_PROJECT_ROOT": "/path/to/your/project"
-      }
+      "args": ["@stylusnexus/skill-loop-cli", "serve"]
     }
   }
 }
@@ -64,20 +55,26 @@ Add to your MCP configuration:
   "mcpServers": {
     "skill-loop": {
       "command": "npx",
-      "args": ["skill-loop-mcp"],
-      "env": {
-        "SKILL_LOOP_PROJECT_ROOT": "/path/to/your/project"
-      }
+      "args": ["@stylusnexus/skill-loop-cli", "serve"]
     }
   }
 }
 ```
 
-The MCP server exposes these tools to your AI agent:
+Then ask your AI tool: **"Initialize skill-loop"**
+
+That's it. From that point forward:
+
+- The MCP server starts automatically when your AI tool launches
+- The agent can self-diagnose skill health, log runs, and propose fixes without you doing anything
+- No CLI commands to remember, no cron jobs to set up
+- Works with Claude Code, Cursor, Windsurf, and any MCP-compatible tool
+
+**Available MCP tools:**
 
 | Tool | Description |
 |------|-------------|
-| `skill_loop_init` | Initialize skill-loop for the project (scan skills, create registry) |
+| `skill_loop_init` | Initialize: scan skills, create registry |
 | `skill_loop_status` | Health dashboard: skill count, run totals, failure rates |
 | `skill_loop_list` | List all registered skills with metadata and broken references |
 | `skill_loop_log` | Record a skill run outcome (success/failure/partial) |
