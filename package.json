@@ -2,7 +2,7 @@
   "name": "@stylusnexus/skill-loop-monorepo",
   "version": "0.0.0",
   "private": true,
-  "description": "Self-improving skills for AI coding tools",
+  "description": "MCP Server for self-improving AI coding skills",
   "workspaces": [
     "packages/*"
   ],
