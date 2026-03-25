@@ -21,6 +21,17 @@ export const DEFAULT_CONFIG: SkillLoopConfig = {
     plugins: [],
     allowSensitiveFields: false,
   },
+  parser: {
+    excludePatterns: [],
+    excludePatternsOverride: false,
+    includePatterns: [],
+    sources: {
+      backtick: true,
+      codeBlock: true,
+      table: true,
+      plainText: false,
+    },
+  },
 };
 
 export async function loadConfig(projectRoot: string): Promise<SkillLoopConfig> {

@@ -214,4 +214,21 @@ export interface SkillLoopConfig {
     /** If true, taskContext and errorDetail are sent to sync plugins. Default: false (redacted). */
     allowSensitiveFields: boolean;
   };
+  parser: ParserConfig;
+}
+
+export interface ParserConfig {
+  /** Additional regex patterns to exclude (merged with built-in defaults). */
+  excludePatterns: string[];
+  /** If true, replaces built-in defaults instead of merging. */
+  excludePatternsOverride: boolean;
+  /** Regex patterns that force-include a candidate (overrides exclusions). */
+  includePatterns: string[];
+  /** Which extraction sources are enabled. */
+  sources: {
+    backtick: boolean;
+    codeBlock: boolean;
+    table: boolean;
+    plainText: boolean;
+  };
 }
