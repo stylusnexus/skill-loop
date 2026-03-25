@@ -33,6 +33,227 @@ function getProjectRoot(): string {
   return process.env.SKILL_LOOP_PROJECT_ROOT || process.cwd();
 }
 
+// ─── Tool: skill_loop (unified natural language router) ───────────
+
+server.registerTool(
+  'skill_loop',
+  {
+    title: 'Skill Loop',
+    description:
+      'Universal entry point for skill-loop. Accepts natural language actions like "scan", "status", "review", "fix", "update", or "history". Routes to the appropriate operation internally. Use this when the user asks about skill health in conversational terms.',
+    inputSchema: z.object({
+      action: z
+        .string()
+        .describe(
+          'What to do. Examples: "scan" (initialize/re-scan skills), "status" (health dashboard), "review" or "inspect" (analyze patterns and flag issues), "fix" or "amend" (propose fixes for broken skills), "update" (re-scan skill registry), "history" or "amendments" (list past amendments), "runs" (show recent runs), "list" (show all skills), "gc" (prune old data)'
+        ),
+      skillName: z
+        .string()
+        .optional()
+        .describe('Optional skill name to target a specific skill'),
+      dryRun: z
+        .boolean()
+        .optional()
+        .describe('For fix/amend: preview changes without applying them'),
+    }),
+  },
+  async ({ action, skillName, dryRun }) => {
+    const normalized = action.toLowerCase().trim();
+    const projectRoot = getProjectRoot();
+    const config = await loadConfig(projectRoot);
+    const telemetryDir = join(projectRoot, config.telemetryDir);
+
+    // Route to the right operation
+    if (['scan', 'init', 'initialize', 'setup'].some((k) => normalized.includes(k))) {
+      // Re-scan / initialize
+      const { mkdir, readFile, writeFile } = await import('node:fs/promises');
+      await mkdir(telemetryDir, { recursive: true });
+
+      const gitignorePath = join(projectRoot, '.gitignore');
+      try {
+        const content = await readFile(gitignorePath, 'utf-8');
+        if (!content.includes(config.telemetryDir)) {
+          await writeFile(gitignorePath, content.trimEnd() + `\n${config.telemetryDir}/\n`);
+        }
+      } catch {
+        await writeFile(gitignorePath, `${config.telemetryDir}/\n`);
+      }
+
+      const registry = new RegistryManager(projectRoot, telemetryDir);
+      const result = await registry.scan(config.skillPaths);
+
+      const lines = [`Scanned and registered ${result.skills.length} skills:`];
+      for (const skill of result.skills) {
+        lines.push(`  ${skill.type}: ${skill.name} (${skill.referencedFiles.length} file refs, ${skill.referencedTools.length} tool refs)`);
+      }
+      return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+    }
+
+    if (['update', 'refresh', 'rescan', 're-scan'].some((k) => normalized.includes(k))) {
+      // Same as scan but framed as an update
+      const registry = new RegistryManager(projectRoot, telemetryDir);
+      const result = await registry.scan(config.skillPaths);
+      return {
+        content: [{ type: 'text' as const, text: `Registry updated: ${result.skills.length} skills registered.` }],
+      };
+    }
+
+    if (['status', 'health', 'check', 'dashboard', 'overview'].some((k) => normalized.includes(k))) {
+      // Delegate to status logic
+      const registry = await readJson<SkillRegistry>(join(telemetryDir, 'registry.json'));
+      const skillCount = registry?.skills.length ?? 0;
+      const writer = new TelemetryWriter(telemetryDir);
+      const runCount = await writer.getRunCount();
+      const index = await writer.getIndex();
+
+      let successes = 0, failures = 0;
+      if (index?.entries) {
+        for (const entry of index.entries) {
+          if (entry.outcome === 'success') successes++;
+          if (entry.outcome === 'failure') failures++;
+        }
+      }
+
+      const lines = [
+        `Skills: ${skillCount} registered`,
+        `Runs: ${runCount} total (${successes} success, ${failures} failure)`,
+      ];
+      if (failures > 0 && runCount > 0) {
+        lines.push(`Failure rate: ${((failures / runCount) * 100).toFixed(1)}%`);
+      }
+      if (runCount === 0) {
+        lines.push('No runs logged yet. Skills will be tracked as they execute.');
+      }
+      return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+    }
+
+    if (['review', 'inspect', 'analyze', 'diagnose', 'audit'].some((k) => normalized.includes(k))) {
+      try { await stat(telemetryDir); } catch {
+        return { content: [{ type: 'text' as const, text: 'Not initialized. Run with action: "scan" first.' }] };
+      }
+
+      const inspector = new Inspector(projectRoot, telemetryDir, config);
+      const result = await inspector.inspect(skillName);
+
+      const registry = await readJson<SkillRegistry>(join(telemetryDir, 'registry.json'));
+      const skillMap = new Map(registry?.skills.map((s) => [s.id, s.name]) ?? []);
+
+      const lines = [`Analyzed ${result.skillCount} skills, ${result.totalRuns} runs in window\n`];
+      for (const p of result.patterns) {
+        const name = skillMap.get(p.skillId) ?? p.skillId.slice(0, 8);
+        lines.push(`  ${name}: ${p.totalRuns} runs, ${(p.failureRate * 100).toFixed(0)}% fail, ${(p.stalenessScore * 100).toFixed(0)}% stale, ${p.trend}`);
+      }
+
+      if (result.flagged.length > 0) {
+        lines.push('', `Flagged (${result.flagged.length}):`);
+        for (const f of result.flagged) {
+          const icon = f.severity === 'high' ? '[HIGH]' : f.severity === 'medium' ? '[MED]' : '[LOW]';
+          lines.push(`  ${icon} ${f.skillName}: ${f.reasons.join('; ')}`);
+        }
+      } else {
+        lines.push('\nAll skills healthy.');
+      }
+      return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+    }
+
+    if (['fix', 'amend', 'repair', 'patch', 'improve'].some((k) => normalized.includes(k))) {
+      try { await stat(telemetryDir); } catch {
+        return { content: [{ type: 'text' as const, text: 'Not initialized. Run with action: "scan" first.' }] };
+      }
+
+      const inspector = new Inspector(projectRoot, telemetryDir, config);
+      const inspection = await inspector.inspect(skillName);
+
+      if (inspection.flagged.length === 0) {
+        return { content: [{ type: 'text' as const, text: 'No skills flagged. All healthy.' }] };
+      }
+
+      const amender = new Amender(projectRoot, telemetryDir, config);
+      const result = await amender.amend(inspection.flagged, dryRun ?? false);
+
+      const lines: string[] = [];
+      if (dryRun) lines.push('DRY RUN — no changes made\n');
+      if (result.proposals.length > 0) {
+        lines.push(`Proposals (${result.proposals.length}):`);
+        for (const p of result.proposals) lines.push(`  ${p.skillName} (${p.changeType}): ${p.reason}`);
+      }
+      if (result.applied.length > 0) {
+        lines.push(`\nApplied (${result.applied.length}):`);
+        for (const a of result.applied) lines.push(`  ${a.id.slice(0, 8)} on branch ${a.branchName}`);
+      }
+      if (result.skipped.length > 0) {
+        lines.push(`\nSkipped: ${result.skipped.join(', ')}`);
+      }
+      return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+    }
+
+    if (['history', 'amendments', 'changes', 'log'].some((k) => normalized.includes(k))) {
+      const amendments = await readJsonl<Amendment>(join(telemetryDir, 'amendments.jsonl'));
+      if (amendments.length === 0) {
+        return { content: [{ type: 'text' as const, text: 'No amendments yet.' }] };
+      }
+      const output = amendments.map((a) => `${a.id.slice(0, 8)} [${a.status}] ${a.changeType}: ${a.reason}`);
+      return { content: [{ type: 'text' as const, text: output.join('\n') }] };
+    }
+
+    if (['runs', 'recent', 'activity'].some((k) => normalized.includes(k))) {
+      const writer = new TelemetryWriter(telemetryDir);
+      const runs = await writer.getAllRuns();
+      const recent = runs.reverse().slice(0, 15);
+      if (recent.length === 0) {
+        return { content: [{ type: 'text' as const, text: 'No runs logged yet.' }] };
+      }
+
+      const registry = await readJson<SkillRegistry>(join(telemetryDir, 'registry.json'));
+      const skillMap = new Map(registry?.skills.map((s) => [s.id, s.name]) ?? []);
+
+      const lines = recent.map((r) => {
+        const name = skillMap.get(r.skillId) ?? r.skillId.slice(0, 8);
+        return `${r.timestamp.slice(0, 16)} ${name}: ${r.outcome}${r.durationMs > 0 ? ` (${r.durationMs}ms)` : ''}`;
+      });
+      return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+    }
+
+    if (['list', 'skills', 'show'].some((k) => normalized.includes(k))) {
+      const registry = await readJson<SkillRegistry>(join(telemetryDir, 'registry.json'));
+      if (!registry || registry.skills.length === 0) {
+        return { content: [{ type: 'text' as const, text: 'No skills registered. Run with action: "scan" first.' }] };
+      }
+      const lines = registry.skills.map((s) => `  ${s.type}: ${s.name} v${s.version} — ${s.description || '(no description)'}`);
+      return { content: [{ type: 'text' as const, text: `${registry.skills.length} skills:\n${lines.join('\n')}` }] };
+    }
+
+    if (['gc', 'clean', 'prune', 'cleanup'].some((k) => normalized.includes(k))) {
+      const { gc } = await import('@stylusnexus/skill-loop');
+      const result = await gc(telemetryDir, config);
+      return {
+        content: [{ type: 'text' as const, text: `Pruned ${result.pruned} old runs (${result.runsBefore} → ${result.runsAfter}).` }],
+      };
+    }
+
+    // Unknown action — help text
+    return {
+      content: [{
+        type: 'text' as const,
+        text: [
+          `Unknown action: "${action}"`,
+          '',
+          'Available actions:',
+          '  scan / init    — Scan and register skills',
+          '  update         — Re-scan skill registry',
+          '  status         — Health dashboard',
+          '  review         — Analyze patterns and flag issues',
+          '  fix            — Propose amendments for broken skills',
+          '  list           — Show all registered skills',
+          '  runs           — Show recent activity',
+          '  history        — List past amendments',
+          '  gc             — Prune old run data',
+        ].join('\n'),
+      }],
+    };
+  }
+);
+
 // ─── Tool: skill_loop_status ──────────────────────────────────────
 
 server.registerTool(
