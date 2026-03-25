@@ -82,7 +82,10 @@ export const DEFAULT_EXCLUDE_PATTERNS: string[] = [
 const PATH_HEURISTIC_RE = /^[\w@.-][\w/.@-]*\.\w{1,10}$/;
 
 function looksLikePath(candidate: string): boolean {
-  return PATH_HEURISTIC_RE.test(candidate) && candidate.includes('/');
+  if (!PATH_HEURISTIC_RE.test(candidate)) return false;
+  // Accept paths with directories (src/lib/foo.ts) or root files with
+  // dot-separated names (playwright.local.config.ts, .env.local)
+  return candidate.includes('/') || (candidate.includes('.') && candidate.length > 5);
 }
 
 // ─── Compiled config for performance ──────────────────────────────
@@ -266,10 +269,14 @@ export function extractReferencedFiles(body: string, config?: ParserConfig): str
 
   // Run each candidate through the evaluation pipeline
   for (const candidate of candidates) {
-    // Clean trailing punctuation that markdown/prose adds
-    const cleaned = candidate.replace(/[,;:)}\]]+$/, '').replace(/^[({[]+/, '');
-    if (evaluateCandidate(cleaned, compiled)) {
-      refs.add(cleaned);
+    // Split on = to handle --flag=path/to/file.ts patterns
+    const parts = candidate.includes('=') ? candidate.split('=') : [candidate];
+    for (const part of parts) {
+      // Clean trailing punctuation that markdown/prose adds
+      const cleaned = part.replace(/[,;:)}\]]+$/, '').replace(/^[({[]+/, '');
+      if (evaluateCandidate(cleaned, compiled)) {
+        refs.add(cleaned);
+      }
     }
   }
 

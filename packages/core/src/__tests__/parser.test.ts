@@ -111,6 +111,16 @@ describe('Parser', () => {
       expect(refs).toContain('src/components/Header.tsx');
     });
 
+    it('extracts paths from --flag=path patterns', () => {
+      const body = [
+        '```bash',
+        'npx playwright test --config=playwright.local.config.ts',
+        '```',
+      ].join('\n');
+      const refs = extractReferencedFiles(body);
+      expect(refs).toContain('playwright.local.config.ts');
+    });
+
     // ─── Table extraction ─────────────────────────────────────────
 
     it('extracts file paths from markdown tables', () => {
