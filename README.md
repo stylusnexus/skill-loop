@@ -217,6 +217,11 @@ Create `skill-loop.config.json` in your project root (all fields optional):
 
 ## CLI Reference
 
+```bash
+npx skill-loop --help    # Show available commands
+npx skill-loop <command> # Run a command
+```
+
 | Command | Description |
 |---------|-------------|
 | `init` | Scan for skills, create `.skill-telemetry/`, update `.gitignore` |
