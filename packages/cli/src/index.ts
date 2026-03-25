@@ -2,7 +2,28 @@
 
 const [command, ...args] = process.argv.slice(2);
 
+function printUsage() {
+  console.log('Usage: npx skill-loop <command>\n');
+  console.log('Commands:');
+  console.log('  init       Scan skills and create .skill-telemetry/');
+  console.log('  status     Health dashboard');
+  console.log('  inspect    Analyze patterns and detect staleness');
+  console.log('  amend      Propose fixes for flagged skills');
+  console.log('  evaluate   Score a proposed amendment');
+  console.log('  rollback   Revert an accepted amendment');
+  console.log('  log        Manually log a skill run');
+  console.log('  gc         Prune old runs');
+  console.log('  doctor     Audit data integrity');
+  console.log('  sync       Flush events to sync plugins');
+  console.log('  serve      Start MCP server (stdio)');
+}
+
 async function main() {
+  if (!command || command === '--help' || command === '-h') {
+    printUsage();
+    process.exit(0);
+  }
+
   const projectRoot = process.cwd();
 
   switch (command) {
@@ -62,20 +83,8 @@ async function main() {
       break;
     }
     default:
-      console.log(`skill-loop: unknown command "${command}"`);
-      console.log('Usage: npx skill-loop <command>\n');
-      console.log('Commands:');
-      console.log('  init       Scan skills and create .skill-telemetry/');
-      console.log('  status     Health dashboard');
-      console.log('  inspect    Analyze patterns and detect staleness');
-      console.log('  amend      Propose fixes for flagged skills');
-      console.log('  evaluate   Score a proposed amendment');
-      console.log('  rollback   Revert an accepted amendment');
-      console.log('  log        Manually log a skill run');
-      console.log('  gc         Prune old runs');
-      console.log('  doctor     Audit data integrity');
-      console.log('  sync       Flush events to sync plugins');
-      console.log('  serve      Start MCP server (stdio)');
+      console.error(`skill-loop: unknown command "${command}"`);
+      printUsage();
       process.exit(1);
   }
 }
