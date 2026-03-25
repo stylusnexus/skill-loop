@@ -19,7 +19,7 @@ function printUsage() {
 }
 
 async function main() {
-  if (!command || command === '--help' || command === '-h') {
+  if (!command || command === '--help' || command === '-h' || command === 'help') {
     printUsage();
     process.exit(0);
   }
