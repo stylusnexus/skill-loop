@@ -20,14 +20,14 @@ SKILL --> RUN --> OBSERVE --> INSPECT --> FIX
 
 ## Packages
 
-| Package | Description | Status |
-|---------|-------------|--------|
-| `@stylusnexus/skill-loop` | Core engine (parser, registry, telemetry) | Phase 1 complete |
-| `@stylusnexus/skill-loop-cli` | CLI (`npx skill-loop <command>`) | Phase 1 complete |
-| `@stylusnexus/skill-loop-claude` | Claude Code adapter (hooks) | Phase 1 complete |
-| `@stylusnexus/skill-loop-mcp` | MCP server (works with any MCP client) | Phase 1 complete |
-| `@stylusnexus/skill-loop-codex` | OpenAI Codex adapter | Complete |
-| `@stylusnexus/skill-loop-copilot` | GitHub Copilot adapter | Complete |
+| Package | Description |
+|---------|-------------|
+| `@stylusnexus/skill-loop` | Core engine (parser, registry, telemetry, inspector, amender) |
+| `@stylusnexus/skill-loop-cli` | CLI (`npx skill-loop <command>`) + MCP server (`serve`) |
+| `@stylusnexus/skill-loop-mcp` | MCP server (works with any MCP-compatible AI tool) |
+| `@stylusnexus/skill-loop-claude` | Claude Code adapter (PreToolUse/PostToolUse hooks) |
+| `@stylusnexus/skill-loop-codex` | OpenAI Codex adapter |
+| `@stylusnexus/skill-loop-copilot` | GitHub Copilot adapter |
 
 ## Install
 
@@ -115,10 +115,10 @@ npx skill-loop status
 # Manually log a run
 npx skill-loop log my-skill success
 
-# Run full inspection (Phase 2)
+# Run full inspection
 npx skill-loop inspect
 
-# Propose fixes for degraded skills (Phase 3)
+# Propose fixes for degraded skills
 npx skill-loop amend
 ```
 
@@ -180,7 +180,7 @@ When a skill executes, a run record is appended to `runs.jsonl`:
 
 A compact index (`runs-index.json`) is maintained alongside for fast queries.
 
-### 3. Detect problems (Phase 2)
+### 3. Detect problems
 
 The inspector analyzes run history to find:
 - Skills with high failure rates
@@ -188,7 +188,7 @@ The inspector analyzes run history to find:
 - Stale references to files/tools that no longer exist
 - Dead skills with zero recent invocations
 
-### 4. Fix automatically (Phase 3)
+### 4. Fix automatically
 
 When a pattern is detected, the amender:
 1. Drafts a targeted SKILL.md patch
@@ -217,18 +217,19 @@ Create `skill-loop.config.json` in your project root (all fields optional):
 
 ## CLI Reference
 
-| Command | Description | Phase |
-|---------|-------------|-------|
-| `init` | Scan for skills, create `.skill-telemetry/`, update `.gitignore` | 1 |
-| `status` | Health dashboard (skill count, run totals, failure rate, storage) | 1 |
-| `log <skill> <outcome>` | Manually log a skill run | 1 |
-| `inspect` | Full analysis with pattern detection and staleness scoring | 2 |
-| `amend` | Generate amendments for flagged skills | 3 |
-| `evaluate <id>` | Test a proposed amendment against recent failures | 3 |
-| `rollback <id>` | Revert a merged amendment via `git revert` | 3 |
-| `gc` | Prune runs older than `maxRunAgeDays` | 4 |
-| `doctor` | Audit cross-file referential integrity | 4 |
-| `sync` | Push buffered events to external services | 4 |
+| Command | Description |
+|---------|-------------|
+| `init` | Scan for skills, create `.skill-telemetry/`, update `.gitignore` |
+| `status` | Health dashboard (skill count, run totals, failure rate, storage) |
+| `log <skill> <outcome>` | Manually log a skill run |
+| `inspect` | Full analysis with pattern detection and staleness scoring |
+| `amend` | Generate amendments for flagged skills |
+| `evaluate <id>` | Test a proposed amendment against recent failures |
+| `rollback <id>` | Revert a merged amendment via `git revert` |
+| `gc` | Prune runs older than `maxRunAgeDays` |
+| `doctor` | Audit cross-file referential integrity |
+| `sync` | Push buffered events to external services |
+| `serve` | Start MCP server (stdio) |
 
 ## Data storage
 
@@ -269,7 +270,7 @@ skill-loop runs entirely on your machine. There are no network calls, no telemet
 | Amendments | `.skill-telemetry/amendments.jsonl` (local, gitignored) | You |
 | Pattern cache | `.skill-telemetry/cache/` (local, gitignored) | You |
 
-No data leaves your machine unless you explicitly configure a sync plugin (Phase 4).
+No data leaves your machine unless you explicitly configure a sync plugin.
 
 ### What skill-loop can read
 
@@ -339,13 +340,6 @@ To explicitly allow sensitive fields (e.g., for a private PostHog instance):
 - skill-loop **never force-pushes** or runs `git reset --hard`.
 - Rollback uses `git revert` (creates a new commit) instead of destructive operations.
 - Amendment branches use a predictable naming convention (`skill-loop/amend-*`) so they're easy to identify and clean up.
-
-## Roadmap
-
-- [x] **Phase 1: Foundation** -- Storage, parser, registry, telemetry, CLI, Claude adapter, MCP server
-- [x] **Phase 2: Intelligence** -- Inspector, pattern detection, staleness scoring
-- [x] **Phase 3: Self-Improvement** -- Amender, evaluator, git-based amendment PRs, rollback
-- [x] **Phase 4: Ecosystem** -- Sync runner with core-enforced privacy, gc, queue management
 
 ## License
 
