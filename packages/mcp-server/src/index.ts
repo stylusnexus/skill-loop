@@ -6,6 +6,7 @@ import { z } from 'zod';
 import {
   RegistryManager,
   TelemetryWriter,
+  Inspector,
   loadConfig,
   readJson,
 } from '@stylusnexus/skill-loop';
@@ -393,6 +394,87 @@ server.registerTool(
         { type: 'text' as const, text: JSON.stringify(output, null, 2) },
       ],
     };
+  }
+);
+
+// ─── Tool: skill_loop_inspect ─────────────────────────────────────
+
+server.registerTool(
+  'skill_loop_inspect',
+  {
+    title: 'Inspect Skills',
+    description:
+      'Run a full inspection of all skills. Analyzes run history to detect failure patterns, staleness (broken file references), routing errors, usage trends, and degrading performance. Returns patterns for each skill and flags issues that exceed configured thresholds. Use this to diagnose why a skill might be underperforming.',
+    inputSchema: z.object({
+      skillName: z
+        .string()
+        .optional()
+        .describe('Inspect a single skill by name (omit for all skills)'),
+    }),
+  },
+  async ({ skillName }) => {
+    const projectRoot = getProjectRoot();
+    const config = await loadConfig(projectRoot);
+    const telemetryDir = join(projectRoot, config.telemetryDir);
+
+    try {
+      await stat(telemetryDir);
+    } catch {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: 'skill-loop is not initialized. Run skill_loop_init first.',
+          },
+        ],
+      };
+    }
+
+    const inspector = new Inspector(projectRoot, telemetryDir, config);
+    const result = await inspector.inspect(skillName);
+
+    const lines = [
+      `Inspection complete: ${result.skillCount} skills analyzed, ${result.totalRuns} runs in window`,
+      '',
+    ];
+
+    // Patterns
+    const registry = await readJson<SkillRegistry>(
+      join(telemetryDir, 'registry.json')
+    );
+    const skillMap = new Map(
+      registry?.skills.map((s) => [s.id, s.name]) ?? []
+    );
+
+    for (const pattern of result.patterns) {
+      const name = skillMap.get(pattern.skillId) ?? pattern.skillId.slice(0, 8);
+      const failPct = (pattern.failureRate * 100).toFixed(0);
+      const stalePct = (pattern.stalenessScore * 100).toFixed(0);
+      lines.push(
+        `  ${name}: ${pattern.totalRuns} runs, ${failPct}% failures, ${stalePct}% stale, trend: ${pattern.trend}`
+      );
+    }
+
+    // Flagged
+    if (result.flagged.length > 0) {
+      lines.push('', `Flagged (${result.flagged.length}):`);
+      for (const flag of result.flagged) {
+        const icon =
+          flag.severity === 'high'
+            ? '[HIGH]'
+            : flag.severity === 'medium'
+              ? '[MED]'
+              : '[LOW]';
+        lines.push(`  ${icon} ${flag.skillName}:`);
+        for (const reason of flag.reasons) {
+          lines.push(`    - ${reason}`);
+        }
+      }
+    } else {
+      lines.push('', 'No issues found. All skills are healthy.');
+    }
+
+    return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
   }
 );
 

@@ -21,9 +21,11 @@ async function main() {
       await statusCommand(projectRoot);
       break;
     }
-    case 'inspect':
-      console.log('skill-loop: inspect not yet implemented (Phase 2)');
+    case 'inspect': {
+      const { inspectCommand } = await import('./commands/inspect.js');
+      await inspectCommand(projectRoot, args);
       break;
+    }
     case 'amend':
       console.log('skill-loop: amend not yet implemented (Phase 3)');
       break;
@@ -36,9 +38,11 @@ async function main() {
     case 'gc':
       console.log('skill-loop: gc not yet implemented (Phase 4)');
       break;
-    case 'doctor':
-      console.log('skill-loop: doctor not yet implemented (Phase 4)');
+    case 'doctor': {
+      const { doctorCommand } = await import('./commands/doctor.js');
+      await doctorCommand(projectRoot);
       break;
+    }
     case 'sync':
       console.log('skill-loop: sync not yet implemented (Phase 4)');
       break;
