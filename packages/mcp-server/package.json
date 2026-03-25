@@ -1,0 +1,27 @@
+{
+  "name": "@stylusnexus/skill-loop-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for skill-loop — lets AI tools self-diagnose and improve their own skills",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "skill-loop-mcp": "dist/index.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.0",
+    "@stylusnexus/skill-loop": "*",
+    "zod": "^3.24.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stylusnexus/skill-loop.git",
+    "directory": "packages/mcp-server"
+  }
+}

@@ -1,0 +1,409 @@
+#!/usr/bin/env node
+
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+import {
+  RegistryManager,
+  TelemetryWriter,
+  loadConfig,
+  readJson,
+} from '@stylusnexus/skill-loop';
+import type {
+  SkillRegistry,
+  SkillRun,
+  RunOutcome,
+  RunsIndex,
+} from '@stylusnexus/skill-loop';
+import { join } from 'node:path';
+import { stat } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+
+const server = new McpServer({
+  name: 'skill-loop',
+  version: '0.1.0',
+});
+
+function getProjectRoot(): string {
+  return process.env.SKILL_LOOP_PROJECT_ROOT || process.cwd();
+}
+
+// ─── Tool: skill_loop_status ──────────────────────────────────────
+
+server.registerTool(
+  'skill_loop_status',
+  {
+    title: 'Skill Loop Status',
+    description:
+      'Get the health status of all registered AI coding tool skills. Shows skill count, run totals, outcome breakdown (success/failure/partial), storage sizes, and overall failure rate. Use this to check if skills are healthy or degrading.',
+    inputSchema: z.object({}),
+  },
+  async () => {
+    const projectRoot = getProjectRoot();
+    const config = await loadConfig(projectRoot);
+    const telemetryDir = join(projectRoot, config.telemetryDir);
+
+    try {
+      await stat(telemetryDir);
+    } catch {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: 'skill-loop is not initialized. Run `npx skill-loop init` first.',
+          },
+        ],
+      };
+    }
+
+    const registry = await readJson<SkillRegistry>(
+      join(telemetryDir, 'registry.json')
+    );
+    const skillCount = registry?.skills.length ?? 0;
+
+    const writer = new TelemetryWriter(telemetryDir);
+    const runCount = await writer.getRunCount();
+    const index = await writer.getIndex();
+
+    let successes = 0,
+      failures = 0,
+      partials = 0,
+      unknowns = 0;
+    if (index?.entries) {
+      for (const entry of index.entries) {
+        switch (entry.outcome) {
+          case 'success':
+            successes++;
+            break;
+          case 'failure':
+            failures++;
+            break;
+          case 'partial':
+            partials++;
+            break;
+          case 'unknown':
+            unknowns++;
+            break;
+        }
+      }
+    }
+
+    const lines = [
+      `Skills registered: ${skillCount}`,
+      `Total runs logged: ${runCount}`,
+      `  Success: ${successes}  Failure: ${failures}  Partial: ${partials}  Unknown: ${unknowns}`,
+    ];
+
+    if (failures > 0 && runCount > 0) {
+      const failRate = ((failures / runCount) * 100).toFixed(1);
+      lines.push(`Overall failure rate: ${failRate}%`);
+    }
+
+    if (skillCount > 0) {
+      lines.push('', 'Registered skills:');
+      for (const skill of registry!.skills) {
+        const skillRuns =
+          index?.entries.filter((e) => e.skillId === skill.id) ?? [];
+        const skillFailures = skillRuns.filter(
+          (e) => e.outcome === 'failure'
+        ).length;
+        const status =
+          skillRuns.length === 0
+            ? 'no runs'
+            : skillFailures > 0
+              ? `${skillFailures}/${skillRuns.length} failures`
+              : `${skillRuns.length} runs, all OK`;
+        lines.push(`  ${skill.type}: ${skill.name} — ${status}`);
+      }
+    }
+
+    return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+  }
+);
+
+// ─── Tool: skill_loop_list ────────────────────────────────────────
+
+server.registerTool(
+  'skill_loop_list',
+  {
+    title: 'List Skills',
+    description:
+      'List all registered skills with their metadata: name, type, version, referenced files, referenced tools, and broken references. Use this to understand what skills are available and their current state.',
+    inputSchema: z.object({
+      name: z
+        .string()
+        .optional()
+        .describe('Filter by skill name (exact match)'),
+    }),
+  },
+  async ({ name }) => {
+    const projectRoot = getProjectRoot();
+    const config = await loadConfig(projectRoot);
+    const telemetryDir = join(projectRoot, config.telemetryDir);
+
+    const registry = await readJson<SkillRegistry>(
+      join(telemetryDir, 'registry.json')
+    );
+    if (!registry || registry.skills.length === 0) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: 'No skills registered. Run `npx skill-loop init` first.',
+          },
+        ],
+      };
+    }
+
+    const skills = name
+      ? registry.skills.filter((s) => s.name === name)
+      : registry.skills;
+
+    if (skills.length === 0) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `No skill found with name "${name}".`,
+          },
+        ],
+      };
+    }
+
+    const output = skills.map((s) => ({
+      name: s.name,
+      type: s.type,
+      version: s.version,
+      filePath: s.filePath,
+      tags: s.tags,
+      referencedFiles: s.referencedFiles,
+      referencedTools: s.referencedTools,
+      brokenReferences: s.brokenReferences,
+      lastModified: s.lastModified,
+    }));
+
+    return {
+      content: [
+        { type: 'text' as const, text: JSON.stringify(output, null, 2) },
+      ],
+    };
+  }
+);
+
+// ─── Tool: skill_loop_log ─────────────────────────────────────────
+
+server.registerTool(
+  'skill_loop_log',
+  {
+    title: 'Log Skill Run',
+    description:
+      'Log a skill run outcome. Use this after a skill executes to record whether it succeeded or failed. This data feeds the inspect and amend pipeline.',
+    inputSchema: z.object({
+      skillName: z.string().describe('Name of the skill that ran'),
+      outcome: z
+        .enum(['success', 'failure', 'partial', 'unknown'])
+        .describe('Outcome of the skill run'),
+      taskContext: z
+        .string()
+        .optional()
+        .describe('What the user was trying to do (max 200 chars)'),
+      errorDetail: z
+        .string()
+        .optional()
+        .describe('Error message if the skill failed'),
+    }),
+  },
+  async ({ skillName, outcome, taskContext, errorDetail }) => {
+    const projectRoot = getProjectRoot();
+    const config = await loadConfig(projectRoot);
+    const telemetryDir = join(projectRoot, config.telemetryDir);
+
+    const registry = await readJson<SkillRegistry>(
+      join(telemetryDir, 'registry.json')
+    );
+    const skill = registry?.skills.find((s) => s.name === skillName);
+
+    if (!skill) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Skill "${skillName}" not found in registry. Run \`npx skill-loop init\` first.`,
+          },
+        ],
+      };
+    }
+
+    const run: SkillRun = {
+      id: randomUUID(),
+      skillId: skill.id,
+      skillVersion: skill.version,
+      timestamp: new Date().toISOString(),
+      platform: 'cli',
+      taskContext: (taskContext ?? 'logged via MCP').slice(0, 200),
+      taskTags: [],
+      outcome: outcome as RunOutcome,
+      errorType: errorDetail ? 'runtime_error' : undefined,
+      errorDetail: errorDetail?.slice(0, 500),
+      durationMs: -1,
+    };
+
+    const writer = new TelemetryWriter(telemetryDir);
+    await writer.logRun(run);
+
+    return {
+      content: [
+        {
+          type: 'text' as const,
+          text: `Logged ${outcome} run for "${skillName}" (${run.id.slice(0, 8)})`,
+        },
+      ],
+    };
+  }
+);
+
+// ─── Tool: skill_loop_init ────────────────────────────────────────
+
+server.registerTool(
+  'skill_loop_init',
+  {
+    title: 'Initialize Skill Loop',
+    description:
+      'Initialize skill-loop for the current project. Scans for SKILL.md files, creates the .skill-telemetry directory, and builds the skill registry. Run this once when setting up a new project.',
+    inputSchema: z.object({}),
+  },
+  async () => {
+    const projectRoot = getProjectRoot();
+    const config = await loadConfig(projectRoot);
+    const telemetryDir = join(projectRoot, config.telemetryDir);
+
+    const { mkdir, readFile, writeFile } = await import('node:fs/promises');
+
+    await mkdir(telemetryDir, { recursive: true });
+
+    // Update .gitignore
+    const gitignorePath = join(projectRoot, '.gitignore');
+    try {
+      const content = await readFile(gitignorePath, 'utf-8');
+      if (!content.includes(config.telemetryDir)) {
+        await writeFile(
+          gitignorePath,
+          content.trimEnd() + `\n${config.telemetryDir}/\n`
+        );
+      }
+    } catch {
+      await writeFile(gitignorePath, `${config.telemetryDir}/\n`);
+    }
+
+    const registry = new RegistryManager(projectRoot, telemetryDir);
+    const result = await registry.scan(config.skillPaths);
+
+    const lines = [
+      `Initialized skill-loop in ${config.telemetryDir}/`,
+      `Registered ${result.skills.length} skills:`,
+    ];
+    for (const skill of result.skills) {
+      lines.push(
+        `  ${skill.type}: ${skill.name} (${skill.referencedFiles.length} file refs, ${skill.referencedTools.length} tool refs)`
+      );
+    }
+
+    return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+  }
+);
+
+// ─── Tool: skill_loop_runs ────────────────────────────────────────
+
+server.registerTool(
+  'skill_loop_runs',
+  {
+    title: 'Query Skill Runs',
+    description:
+      'Query logged skill runs. Filter by skill name, outcome, or get recent runs. Use this to investigate skill performance and find failure patterns.',
+    inputSchema: z.object({
+      skillName: z
+        .string()
+        .optional()
+        .describe('Filter runs by skill name'),
+      outcome: z
+        .enum(['success', 'failure', 'partial', 'unknown'])
+        .optional()
+        .describe('Filter by outcome'),
+      limit: z
+        .number()
+        .optional()
+        .default(20)
+        .describe('Max number of runs to return (default 20)'),
+    }),
+  },
+  async ({ skillName, outcome, limit }) => {
+    const projectRoot = getProjectRoot();
+    const config = await loadConfig(projectRoot);
+    const telemetryDir = join(projectRoot, config.telemetryDir);
+
+    const writer = new TelemetryWriter(telemetryDir);
+    let runs = await writer.getAllRuns();
+
+    // Resolve skill name to ID
+    if (skillName) {
+      const registry = await readJson<SkillRegistry>(
+        join(telemetryDir, 'registry.json')
+      );
+      const skill = registry?.skills.find((s) => s.name === skillName);
+      if (skill) {
+        runs = runs.filter((r) => r.skillId === skill.id);
+      } else {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `Skill "${skillName}" not found in registry.`,
+            },
+          ],
+        };
+      }
+    }
+
+    if (outcome) {
+      runs = runs.filter((r) => r.outcome === outcome);
+    }
+
+    // Most recent first, limited
+    const recent = runs.reverse().slice(0, limit ?? 20);
+
+    if (recent.length === 0) {
+      return {
+        content: [{ type: 'text' as const, text: 'No matching runs found.' }],
+      };
+    }
+
+    const output = recent.map((r) => ({
+      id: r.id.slice(0, 8),
+      skill: r.skillId.slice(0, 8),
+      outcome: r.outcome,
+      platform: r.platform,
+      timestamp: r.timestamp,
+      durationMs: r.durationMs,
+      errorType: r.errorType,
+      taskContext: r.taskContext,
+    }));
+
+    return {
+      content: [
+        { type: 'text' as const, text: JSON.stringify(output, null, 2) },
+      ],
+    };
+  }
+);
+
+// ─── Start Server ─────────────────────────────────────────────────
+
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+main().catch((err) => {
+  console.error('skill-loop MCP server error:', err);
+  process.exit(1);
+});
