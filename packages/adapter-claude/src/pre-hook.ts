@@ -1,14 +1,60 @@
-/**
- * Claude Code PreToolUse hook handler.
- *
- * Reads hook input from stdin (JSON with tool_name, tool_input),
- * starts a run timer, and writes the pre-invocation context
- * to a temp file for the post-hook to pick up.
- */
+import { writeFile, mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+
+interface HookInput {
+  tool_name: string;
+  tool_input: {
+    skill?: string;
+    [key: string]: unknown;
+  };
+}
+
+interface PendingContext {
+  runId: string;
+  skillName: string;
+  startedAt: string;
+  taskContext: string;
+}
+
 export async function preHook(): Promise<void> {
-  // TODO: Phase 1 implementation
-  // 1. Read stdin JSON from Claude Code hook system
-  // 2. Extract skill name from tool_input
-  // 3. Look up skill in registry to get skillId + version
-  // 4. Write pre-run context to .skill-telemetry/.pending/<uuid>.json
+  const input = await readStdin();
+  if (!input) return;
+
+  let hookInput: HookInput;
+  try {
+    hookInput = JSON.parse(input);
+  } catch {
+    return;
+  }
+
+  if (hookInput.tool_name !== 'Skill') return;
+
+  const skillName = hookInput.tool_input?.skill;
+  if (!skillName) return;
+
+  const pendingDir = join(process.cwd(), '.skill-telemetry', '.pending');
+  await mkdir(pendingDir, { recursive: true });
+
+  const runId = randomUUID();
+  const context: PendingContext = {
+    runId,
+    skillName,
+    startedAt: new Date().toISOString(),
+    taskContext: typeof hookInput.tool_input === 'object'
+      ? JSON.stringify(hookInput.tool_input).slice(0, 200)
+      : '',
+  };
+
+  await writeFile(join(pendingDir, `${runId}.json`), JSON.stringify(context));
+}
+
+function readStdin(): Promise<string> {
+  return new Promise((resolve) => {
+    let data = '';
+    process.stdin.setEncoding('utf-8');
+    process.stdin.on('data', (chunk) => { data += chunk; });
+    process.stdin.on('end', () => resolve(data));
+    setTimeout(() => resolve(data), 1000);
+  });
 }

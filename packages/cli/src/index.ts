@@ -1,64 +1,46 @@
 #!/usr/bin/env node
 
-/**
- * skill-loop CLI
- *
- * Usage:
- *   npx skill-loop init
- *   npx skill-loop status
- *   npx skill-loop inspect [--skill <name>]
- *   npx skill-loop amend [--skill <name>] [--dry-run]
- *   npx skill-loop evaluate <amendment-id>
- *   npx skill-loop rollback <amendment-id>
- *   npx skill-loop log <skill> <outcome>
- *   npx skill-loop gc
- *   npx skill-loop doctor
- *   npx skill-loop sync
- */
-
 const [command, ...args] = process.argv.slice(2);
 
 async function main() {
+  const projectRoot = process.cwd();
+
   switch (command) {
-    case 'init':
-      // TODO: Phase 1
-      console.log('skill-loop: init not yet implemented');
+    case 'init': {
+      const { initCommand } = await import('./commands/init.js');
+      await initCommand(projectRoot);
       break;
-    case 'status':
-      // TODO: Phase 1
-      console.log('skill-loop: status not yet implemented');
+    }
+    case 'log': {
+      const { logCommand } = await import('./commands/log.js');
+      await logCommand(projectRoot, args);
       break;
+    }
+    case 'status': {
+      const { statusCommand } = await import('./commands/status.js');
+      await statusCommand(projectRoot);
+      break;
+    }
     case 'inspect':
-      // TODO: Phase 2
-      console.log('skill-loop: inspect not yet implemented');
+      console.log('skill-loop: inspect not yet implemented (Phase 2)');
       break;
     case 'amend':
-      // TODO: Phase 3
-      console.log('skill-loop: amend not yet implemented');
+      console.log('skill-loop: amend not yet implemented (Phase 3)');
       break;
     case 'evaluate':
-      // TODO: Phase 3
-      console.log('skill-loop: evaluate not yet implemented');
+      console.log('skill-loop: evaluate not yet implemented (Phase 3)');
       break;
     case 'rollback':
-      // TODO: Phase 3
-      console.log('skill-loop: rollback not yet implemented');
-      break;
-    case 'log':
-      // TODO: Phase 1
-      console.log('skill-loop: log not yet implemented');
+      console.log('skill-loop: rollback not yet implemented (Phase 3)');
       break;
     case 'gc':
-      // TODO: Phase 4
-      console.log('skill-loop: gc not yet implemented');
+      console.log('skill-loop: gc not yet implemented (Phase 4)');
       break;
     case 'doctor':
-      // TODO: Phase 4
-      console.log('skill-loop: doctor not yet implemented');
+      console.log('skill-loop: doctor not yet implemented (Phase 4)');
       break;
     case 'sync':
-      // TODO: Phase 4
-      console.log('skill-loop: sync not yet implemented');
+      console.log('skill-loop: sync not yet implemented (Phase 4)');
       break;
     default:
       console.log(`skill-loop: unknown command "${command}"`);

@@ -8,11 +8,12 @@
   ],
   "scripts": {
     "build": "turbo run build",
-    "test": "turbo run test",
+    "test": "cd packages/core && npx vitest run",
     "lint": "turbo run lint",
     "clean": "turbo run clean"
   },
   "devDependencies": {
+    "@types/node": "^25.5.0",
     "turbo": "^2.5.0",
     "typescript": "^5.8.0"
   },

@@ -15,7 +15,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@stylusnexus/skill-loop": "workspace:*"
+    "@stylusnexus/skill-loop": "*"
   },
   "license": "MIT",
   "repository": {
