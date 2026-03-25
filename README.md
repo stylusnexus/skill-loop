@@ -333,7 +333,7 @@ To explicitly allow sensitive fields (e.g., for a private PostHog instance):
 - [x] **Phase 1: Foundation** -- Storage, parser, registry, telemetry, CLI, Claude adapter, MCP server
 - [x] **Phase 2: Intelligence** -- Inspector, pattern detection, staleness scoring
 - [x] **Phase 3: Self-Improvement** -- Amender, evaluator, git-based amendment PRs, rollback
-- [ ] **Phase 4: Ecosystem** -- External sync plugins, PostHog adapter, Codex/Copilot adapters, gc/doctor
+- [x] **Phase 4: Ecosystem** -- Sync runner with core-enforced privacy, gc, queue management
 
 ## License
 

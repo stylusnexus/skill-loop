@@ -41,17 +41,21 @@ async function main() {
       await rollbackCommand(projectRoot, args);
       break;
     }
-    case 'gc':
-      console.log('skill-loop: gc not yet implemented (Phase 4)');
+    case 'gc': {
+      const { gcCommand } = await import('./commands/gc.js');
+      await gcCommand(projectRoot);
       break;
+    }
     case 'doctor': {
       const { doctorCommand } = await import('./commands/doctor.js');
       await doctorCommand(projectRoot);
       break;
     }
-    case 'sync':
-      console.log('skill-loop: sync not yet implemented (Phase 4)');
+    case 'sync': {
+      const { syncCommand } = await import('./commands/sync.js');
+      await syncCommand(projectRoot);
       break;
+    }
     default:
       console.log(`skill-loop: unknown command "${command}"`);
       console.log('Usage: npx skill-loop <init|status|inspect|amend|evaluate|rollback|log|gc|doctor|sync>');

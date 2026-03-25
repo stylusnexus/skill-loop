@@ -13,3 +13,6 @@ export type { EvaluationResult } from './evaluator.js';
 export { createUnifiedDiff } from './diff.js';
 export * from './git.js';
 export { sanitizeRunForSync } from './sanitizer.js';
+export { SyncRunner } from './sync.js';
+export { gc } from './gc.js';
+export type { GcResult } from './gc.js';

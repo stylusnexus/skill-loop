@@ -366,7 +366,8 @@ npx skill-loop sync                    # Push buffered events to external servic
     "maxFileSizeMB": 10
   },
   "sync": {
-    "plugins": []
+    "plugins": [],
+    "allowSensitiveFields": false
   }
 }
 ```
@@ -375,55 +376,90 @@ npx skill-loop sync                    # Push buffered events to external servic
 
 Designed for privacy-first, non-blocking sync to external services.
 
+**Core-enforced privacy:** Sensitive fields (`taskContext`, `errorDetail`) are redacted by the core's `sanitizeRunForSync()` before any plugin receives data. Plugins receive `SanitizedSkillRun`, not raw `SkillRun`. Users must explicitly set `sync.allowSensitiveFields: true` to pass sensitive data through.
+
 ```typescript
+// Plugins receive sanitized data — sensitive fields already redacted by core
 interface SyncPlugin {
   name: string;
   version: string;
-  filter(run: SkillRun): boolean;          // plugin declares what it wants
-  sanitize(run: SkillRun): SyncPayload;    // plugin owns PII scrubbing
-  emit(event: SyncEvent): Promise<void>;   // fire-and-forget, must not throw
+  filter(run: SanitizedSkillRun): boolean;  // plugin declares what events it wants
+  emit(event: SyncEvent): Promise<void>;    // fire-and-forget, must not throw
 }
 
-// Stable public contract, decoupled from internal types
+// What plugins see — taskContext/errorDetail are "[redacted]" by default
+interface SanitizedSkillRun {
+  id: string;
+  skillId: string;
+  skillVersion: number;
+  timestamp: string;
+  platform: Platform;
+  taskContext: string;      // "[redacted]" unless allowSensitiveFields
+  taskTags: string[];
+  outcome: RunOutcome;
+  errorType?: ErrorType;
+  errorDetail?: string;     // "[redacted]" unless allowSensitiveFields
+  durationMs: number;
+  amendmentId?: string;
+}
+
 type SyncEvent =
-  | { type: 'run_completed'; payload: SyncPayload }
-  | { type: 'amendment_proposed'; payload: AmendmentSummary }
-  | { type: 'amendment_evaluated'; payload: AmendmentSummary }
-  | { type: 'registry_updated'; payload: RegistrySummary };
+  | { type: 'run_completed'; payload: SanitizedSkillRun }
+  | { type: 'amendment_proposed'; payload: SyncPayload }
+  | { type: 'amendment_evaluated'; payload: SyncPayload }
+  | { type: 'registry_updated'; payload: SyncPayload };
 ```
 
 - `emit` fires asynchronously after local write completes — never blocks the local loop
 - Undelivered events buffered in `.skill-telemetry/sync-queue.jsonl` with TTL
-- Each plugin owns its own `filter` and `sanitize` — the core cannot know what each target considers sensitive
+- Core enforces sanitization — plugins cannot bypass it
+
+## MCP Server
+
+`@stylusnexus/skill-loop-mcp` exposes 9 tools to any MCP-compatible AI client:
+
+| Tool | Phase | Description |
+|------|-------|-------------|
+| `skill_loop_init` | 1 | Initialize: scan skills, create registry |
+| `skill_loop_status` | 1 | Health dashboard with per-skill breakdown |
+| `skill_loop_list` | 1 | List skills with metadata |
+| `skill_loop_log` | 1 | Record a skill run outcome |
+| `skill_loop_runs` | 1 | Query run history with filters |
+| `skill_loop_inspect` | 2 | Pattern detection, staleness scoring, flagging |
+| `skill_loop_amend` | 3 | Propose and apply SKILL.md fixes (creates branch) |
+| `skill_loop_evaluate` | 3 | Score amendment against baseline, accept/reject |
+| `skill_loop_amendments` | 3 | List amendment history |
 
 ## Implementation Phases
 
-### Phase 1: Foundation (MVP)
+### Phase 1: Foundation (MVP) -- DONE
 - Core: parser, registry, telemetry writer, storage layer with atomic writes
 - CLI: `init`, `log`, `status`
 - Claude adapter: PreToolUse/PostToolUse hooks
-- Test suite for core
+- MCP server with 5 tools
+- 28 tests
 
-### Phase 2: Intelligence
-- Core: inspector, pattern cache
+### Phase 2: Intelligence -- DONE
+- Core: inspector, pattern cache, staleness scoring, trend detection
 - CLI: `inspect`, `doctor`
-- Staleness detection (cross-reference files/tools against codebase)
+- MCP: `skill_loop_inspect` tool
+- 8 tests (36 total)
 
-### Phase 3: Self-Improvement
-- Core: amender, evaluator, git operations
-- CLI: `amend`, `evaluate`, `rollback`
-- Amendment prompt templates
-- PR generation with evaluation results
+### Phase 3: Self-Improvement -- DONE
+- Core: amender (3 fix strategies), evaluator (heuristic scoring), git operations, diff utility
+- Core: `sanitizeRunForSync` — core-enforced privacy for sync plugins
+- CLI: `amend` (--dry-run, --skill), `evaluate`, `rollback`
+- MCP: `skill_loop_amend`, `skill_loop_evaluate`, `skill_loop_amendments` tools
+- 20 tests (56 total)
 
 ### Phase 4: Ecosystem
-- External sync plugin interface
-- PostHog sync plugin
-- Codex adapter
-- `gc` command
-- Documentation and npm publish
+- Sync runner with plugin loading and queue management
+- `gc` command (prune old runs)
+- Codex/Copilot adapter stubs
+- npm publish preparation
 
-## Open Questions
+## Resolved Questions
 
-1. **Evaluation replay fidelity**: Re-running a skill against saved `taskContext` may not perfectly reproduce the original failure if the codebase has changed since. How much does this matter in practice?
-2. **AI call for amendments**: Should the amender use a specific model (e.g., always Claude Sonnet for cost efficiency) or defer to whatever the project's default AI tool is?
-3. **Cross-project learning**: Could anonymized pattern data from multiple StylusNexus projects improve amendment quality? (Future consideration, privacy implications.)
+1. **Evaluation replay fidelity**: Solved with heuristic scoring. The evaluator scores amendments by change-type confidence (reference fixes are high confidence, instruction changes are lower) rather than literal replay. This avoids the fidelity problem entirely.
+2. **AI call for amendments**: The amender uses rule-based strategies (broken references, routing guards, failure context). AI-assisted amendments are deferred to a future iteration — the rule-based approach covers the most common failure modes.
+3. **Sync privacy**: Solved at the core level. `sanitizeRunForSync()` redacts sensitive fields before plugins see them. `sync.allowSensitiveFields` is the explicit opt-in.
