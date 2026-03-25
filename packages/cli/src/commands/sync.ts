@@ -1,4 +1,4 @@
-import { SyncRunner, loadConfig } from '@stylusnexus/skill-loop';
+import { SyncRunner, loadConfig, loadPlugins } from '@stylusnexus/skill-loop';
 import { join } from 'node:path';
 import { stat } from 'node:fs/promises';
 
@@ -19,12 +19,34 @@ export async function syncCommand(projectRoot: string): Promise<void> {
     return;
   }
 
-  console.log(`Flushing sync queue (${config.sync.plugins.length} plugin(s) configured)...\n`);
-
   const runner = new SyncRunner(telemetryDir, config);
+  const loadResult = await loadPlugins(runner, config);
 
-  // Plugin loading would go here — for now, report that plugins need to be registered
-  console.log('Plugin loading is not yet implemented.');
-  console.log('Registered plugins will be loaded from sync.plugins config in a future update.');
-  console.log('\nTo manually flush queued events, plugins must be registered programmatically via the SyncRunner API.');
+  if (loadResult.loaded.length > 0) {
+    console.log(`Loaded ${loadResult.loaded.length} plugin(s): ${loadResult.loaded.join(', ')}`);
+  }
+  if (loadResult.failed.length > 0) {
+    console.log(`Failed to load ${loadResult.failed.length} plugin(s):`);
+    for (const f of loadResult.failed) {
+      console.log(`  ${f.name}: ${f.error}`);
+    }
+  }
+
+  if (runner.pluginCount === 0) {
+    console.log('\nNo plugins loaded successfully. Nothing to sync.');
+    return;
+  }
+
+  console.log('\nFlushing sync queue...');
+  const flushResult = await runner.flush();
+
+  console.log(`  Retried:  ${flushResult.retried}`);
+  console.log(`  Expired:  ${flushResult.expired}`);
+  console.log(`  Failed:   ${flushResult.failed}`);
+
+  if (flushResult.retried === 0 && flushResult.expired === 0 && flushResult.failed === 0) {
+    console.log('\nSync queue is empty. Nothing to flush.');
+  } else {
+    console.log('\nSync complete.');
+  }
 }

@@ -16,3 +16,5 @@ export { sanitizeRunForSync } from './sanitizer.js';
 export { SyncRunner } from './sync.js';
 export { gc } from './gc.js';
 export type { GcResult } from './gc.js';
+export { loadPlugins } from './plugin-loader.js';
+export type { PluginLoadResult } from './plugin-loader.js';
