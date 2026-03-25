@@ -82,6 +82,10 @@ The MCP server exposes these tools to your AI agent:
 | `skill_loop_list` | List all registered skills with metadata and broken references |
 | `skill_loop_log` | Record a skill run outcome (success/failure/partial) |
 | `skill_loop_runs` | Query run history, filter by skill name or outcome |
+| `skill_loop_inspect` | Analyze run patterns, detect staleness, flag degrading skills |
+| `skill_loop_amend` | Propose and apply SKILL.md fixes (creates git branch, never modifies working branch) |
+| `skill_loop_evaluate` | Score an amendment against baseline and accept/reject |
+| `skill_loop_amendments` | List amendment history with status filter |
 
 ### Option 2: CLI
 
@@ -240,11 +244,75 @@ Safe to delete: cache files, sync queue. Loses history: runs, amendments.
 
 See [docs/design.md](docs/design.md) for the full design document.
 
+## Security
+
+### Everything is local
+
+skill-loop runs entirely on your machine. There are no network calls, no telemetry, no analytics, and no cloud dependencies.
+
+| What | Where | Who can access |
+|------|-------|----------------|
+| Skill registry | `.skill-telemetry/registry.json` (local, gitignored) | You |
+| Run logs | `.skill-telemetry/runs.jsonl` (local, gitignored) | You |
+| Amendments | `.skill-telemetry/amendments.jsonl` (local, gitignored) | You |
+| Pattern cache | `.skill-telemetry/cache/` (local, gitignored) | You |
+
+No data leaves your machine unless you explicitly configure a sync plugin (Phase 4).
+
+### What skill-loop can read
+
+- SKILL.md files in your configured `skillPaths` (default: `.claude/skills/`, `.claude/agents/`)
+- File existence checks for referenced paths (to detect staleness)
+- Your `skill-loop.config.json` (if it exists)
+- Git branch and commit state (for amendments)
+
+It does **not** read your source code, environment variables, secrets, or any files outside the skill paths and telemetry directory.
+
+### What skill-loop can write
+
+- Files in `.skill-telemetry/` (run logs, registry, cache, reports)
+- SKILL.md files **only during amendments** (on a new git branch, never on your working branch)
+- `.gitignore` (adds `.skill-telemetry/` entry during `init`)
+
+### Permissions and the amend tool
+
+The `skill_loop_amend` MCP tool and `npx skill-loop amend` CLI command **modify SKILL.md files** by:
+
+1. Creating a new git branch (`skill-loop/amend-<name>-<hash>`)
+2. Writing the amended SKILL.md on that branch
+3. Committing the change
+4. Switching back to your original branch
+
+**Your working branch is never modified.** Amendments live on isolated branches until you review and merge them.
+
+When using the MCP server, your AI tool's permission system governs whether `skill_loop_amend` can execute:
+- **Claude Code**: Prompts you for approval in `default` permission mode
+- **Cursor/Windsurf**: Uses their built-in tool approval flow
+- **`--dry-run`**: Always available to preview proposals without any file changes
+
+### Sync plugins (Phase 4, not yet implemented)
+
+Future sync plugins may send run data to external services (PostHog, etc.). When this is implemented:
+
+- Sync is **opt-in** — disabled by default, requires explicit configuration
+- Each plugin owns its own `filter()` (what data to send) and `sanitize()` (PII scrubbing)
+- The core engine never touches the network — only plugins do
+- Sync is fire-and-forget and never blocks the local feedback loop
+
+**Recommendation:** Review any sync plugin's `filter` and `sanitize` implementations before enabling it. Run data may contain task context strings (what the user was doing) and error details that could be sensitive.
+
+### Git safety
+
+- skill-loop **never pushes** to a remote. All git operations are local.
+- skill-loop **never force-pushes** or runs `git reset --hard`.
+- Rollback uses `git revert` (creates a new commit) instead of destructive operations.
+- Amendment branches use a predictable naming convention (`skill-loop/amend-*`) so they're easy to identify and clean up.
+
 ## Roadmap
 
 - [x] **Phase 1: Foundation** -- Storage, parser, registry, telemetry, CLI, Claude adapter, MCP server
-- [ ] **Phase 2: Intelligence** -- Inspector, pattern detection, staleness scoring
-- [ ] **Phase 3: Self-Improvement** -- Amender, evaluator, git-based amendment PRs, rollback
+- [x] **Phase 2: Intelligence** -- Inspector, pattern detection, staleness scoring
+- [x] **Phase 3: Self-Improvement** -- Amender, evaluator, git-based amendment PRs, rollback
 - [ ] **Phase 4: Ecosystem** -- External sync plugins, PostHog adapter, Codex/Copilot adapters, gc/doctor
 
 ## License
