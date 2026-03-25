@@ -663,12 +663,22 @@ server.registerTool(
 
 // ─── Start Server ─────────────────────────────────────────────────
 
-async function main() {
+/**
+ * Start the MCP server over stdio.
+ * Exported so the CLI `serve` command can call it directly.
+ */
+export async function startMcpServer(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
 
-main().catch((err) => {
-  console.error('skill-loop MCP server error:', err);
-  process.exit(1);
-});
+// Auto-start when run directly (not imported)
+const isDirectRun = process.argv[1]?.endsWith('index.js') &&
+  !process.argv[1]?.includes('cli');
+
+if (isDirectRun) {
+  startMcpServer().catch((err) => {
+    console.error('skill-loop MCP server error:', err);
+    process.exit(1);
+  });
+}

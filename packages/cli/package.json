@@ -13,7 +13,8 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@stylusnexus/skill-loop": "*"
+    "@stylusnexus/skill-loop": "*",
+    "@stylusnexus/skill-loop-mcp": "*"
   },
   "license": "MIT",
   "repository": {

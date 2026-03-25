@@ -4,9 +4,10 @@
     "outDir": "dist",
     "rootDir": "src",
     "paths": {
-      "@stylusnexus/skill-loop": ["../core/src/index.ts"]
+      "@stylusnexus/skill-loop": ["../core/src/index.ts"],
+      "@stylusnexus/skill-loop-mcp": ["../mcp-server/src/index.ts"]
     }
   },
   "include": ["src"],
-  "references": [{ "path": "../core" }]
+  "references": [{ "path": "../core" }, { "path": "../mcp-server" }]
 }

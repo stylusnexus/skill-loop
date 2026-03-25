@@ -56,9 +56,26 @@ async function main() {
       await syncCommand(projectRoot);
       break;
     }
+    case 'serve': {
+      const { serveCommand } = await import('./commands/serve.js');
+      await serveCommand();
+      break;
+    }
     default:
       console.log(`skill-loop: unknown command "${command}"`);
-      console.log('Usage: npx skill-loop <init|status|inspect|amend|evaluate|rollback|log|gc|doctor|sync>');
+      console.log('Usage: npx skill-loop <command>\n');
+      console.log('Commands:');
+      console.log('  init       Scan skills and create .skill-telemetry/');
+      console.log('  status     Health dashboard');
+      console.log('  inspect    Analyze patterns and detect staleness');
+      console.log('  amend      Propose fixes for flagged skills');
+      console.log('  evaluate   Score a proposed amendment');
+      console.log('  rollback   Revert an accepted amendment');
+      console.log('  log        Manually log a skill run');
+      console.log('  gc         Prune old runs');
+      console.log('  doctor     Audit data integrity');
+      console.log('  sync       Flush events to sync plugins');
+      console.log('  serve      Start MCP server (stdio)');
       process.exit(1);
   }
 }

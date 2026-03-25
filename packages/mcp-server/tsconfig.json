@@ -3,6 +3,7 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
+    "composite": true,
     "paths": {
       "@stylusnexus/skill-loop": ["../core/src/index.ts"]
     }
