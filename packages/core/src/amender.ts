@@ -238,11 +238,12 @@ export class Amender {
    */
   private fixBrokenReferences(content: string, brokenRefs: string[]): string {
     let result = content;
+    const annotation = '*(file not found — may have moved)*';
     for (const ref of brokenRefs) {
-      // Replace backtick-quoted references with a note
       const escaped = ref.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = new RegExp('`' + escaped + '`', 'g');
-      result = result.replace(re, `\`${ref}\` *(file not found — may have moved)*`);
+      // Match the backtick reference NOT already followed by the annotation
+      const re = new RegExp('`' + escaped + '`(?!\\s*\\*\\(file not found)', 'g');
+      result = result.replace(re, `\`${ref}\` ${annotation}`);
     }
     return result;
   }
@@ -258,6 +259,9 @@ export class Amender {
     // Add a "Do NOT use for" section after the frontmatter
     const frontmatterEnd = content.indexOf('---', content.indexOf('---') + 3);
     if (frontmatterEnd === -1) return content;
+
+    // Idempotency: skip if already present
+    if (content.includes('**Routing note:**')) return content;
 
     const insertPoint = content.indexOf('\n', frontmatterEnd) + 1;
     const guard = '\n> **Routing note:** This skill has been misrouted frequently. Only use when the task specifically matches the description above.\n';
@@ -275,6 +279,12 @@ export class Amender {
       .slice(-5);
 
     if (errorDetails.length === 0) return content;
+
+    // Idempotency: replace existing section if present, or append
+    if (content.includes('## Known Issues (auto-detected by skill-loop)')) {
+      // Remove existing section and re-add with fresh data
+      content = content.replace(/\n## Known Issues \(auto-detected by skill-loop\)[\s\S]*?Consider these failure modes when executing this skill\.\n?/, '');
+    }
 
     // Deduplicate similar errors
     const unique = [...new Set(errorDetails.map(e => e.slice(0, 100)))];
