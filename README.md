@@ -26,8 +26,8 @@ SKILL --> RUN --> OBSERVE --> INSPECT --> FIX
 | `@stylusnexus/skill-loop-cli` | CLI (`npx skill-loop <command>`) | Phase 1 complete |
 | `@stylusnexus/skill-loop-claude` | Claude Code adapter (hooks) | Phase 1 complete |
 | `@stylusnexus/skill-loop-mcp` | MCP server (works with any MCP client) | Phase 1 complete |
-| `@stylusnexus/skill-loop-codex` | OpenAI Codex adapter | Planned |
-| `@stylusnexus/skill-loop-copilot` | GitHub Copilot adapter | Planned |
+| `@stylusnexus/skill-loop-codex` | OpenAI Codex adapter | Complete |
+| `@stylusnexus/skill-loop-copilot` | GitHub Copilot adapter | Complete |
 
 ## Install
 
@@ -250,8 +250,8 @@ Safe to delete: cache files, sync queue. Loses history: runs, amendments.
 +-- @stylusnexus/skill-loop-mcp      (MCP server - any MCP client)
 +-- @stylusnexus/skill-loop-claude    (Claude Code hooks)
 +-- @stylusnexus/skill-loop-cli       (CLI commands)
-+-- @stylusnexus/skill-loop-codex     (OpenAI Codex - planned)
-+-- @stylusnexus/skill-loop-copilot   (GitHub Copilot - planned)
++-- @stylusnexus/skill-loop-codex     (OpenAI Codex)
++-- @stylusnexus/skill-loop-copilot   (GitHub Copilot)
 ```
 
 See [docs/design.md](docs/design.md) for the full design document.
