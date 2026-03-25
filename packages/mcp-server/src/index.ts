@@ -7,14 +7,18 @@ import {
   RegistryManager,
   TelemetryWriter,
   Inspector,
+  Amender,
+  Evaluator,
   loadConfig,
   readJson,
+  readJsonl,
 } from '@stylusnexus/skill-loop';
 import type {
   SkillRegistry,
   SkillRun,
   RunOutcome,
   RunsIndex,
+  Amendment,
 } from '@stylusnexus/skill-loop';
 import { join } from 'node:path';
 import { stat } from 'node:fs/promises';
@@ -475,6 +479,185 @@ server.registerTool(
     }
 
     return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+  }
+);
+
+// ─── Tool: skill_loop_amend ───────────────────────────────────────
+
+server.registerTool(
+  'skill_loop_amend',
+  {
+    title: 'Amend Skills',
+    description:
+      'Generate and apply amendments for flagged skills. Runs inspection first, then proposes fixes for broken references, high failure rates, routing issues, and degrading trends. Creates a git branch per amendment. IMPORTANT: This modifies SKILL.md files on a new branch — the user should review changes before merging. Use --dry-run to preview without changes.',
+    inputSchema: z.object({
+      skillName: z
+        .string()
+        .optional()
+        .describe('Amend a single skill by name (omit for all flagged skills)'),
+      dryRun: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Preview proposals without creating branches or modifying files'),
+    }),
+  },
+  async ({ skillName, dryRun }) => {
+    const projectRoot = getProjectRoot();
+    const config = await loadConfig(projectRoot);
+    const telemetryDir = join(projectRoot, config.telemetryDir);
+
+    try {
+      await stat(telemetryDir);
+    } catch {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: 'skill-loop is not initialized. Run skill_loop_init first.',
+          },
+        ],
+      };
+    }
+
+    const inspector = new Inspector(projectRoot, telemetryDir, config);
+    const inspection = await inspector.inspect(skillName);
+
+    if (inspection.flagged.length === 0) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: 'No skills flagged for amendment. All skills are healthy.',
+          },
+        ],
+      };
+    }
+
+    const amender = new Amender(projectRoot, telemetryDir, config);
+    const result = await amender.amend(inspection.flagged, dryRun ?? false);
+
+    const lines: string[] = [];
+
+    if (dryRun) {
+      lines.push('DRY RUN — no changes made\n');
+    }
+
+    if (result.proposals.length > 0) {
+      lines.push(`Proposals (${result.proposals.length}):`);
+      for (const p of result.proposals) {
+        lines.push(`  ${p.skillName} (${p.changeType}): ${p.reason}`);
+      }
+    }
+
+    if (result.applied.length > 0) {
+      lines.push('', `Applied (${result.applied.length}):`);
+      for (const a of result.applied) {
+        lines.push(`  ${a.id.slice(0, 8)} on branch ${a.branchName}`);
+        lines.push(`  Evaluate with: skill_loop_evaluate(amendmentId: "${a.id}")`);
+      }
+    }
+
+    if (result.skipped.length > 0) {
+      lines.push('', `Skipped: ${result.skipped.join(', ')}`);
+    }
+
+    return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+  }
+);
+
+// ─── Tool: skill_loop_evaluate ────────────────────────────────────
+
+server.registerTool(
+  'skill_loop_evaluate',
+  {
+    title: 'Evaluate Amendment',
+    description:
+      'Evaluate a proposed skill amendment. Scores the amendment against the baseline success rate and accepts or rejects it. Accepted amendments should be reviewed by the user before merging the branch.',
+    inputSchema: z.object({
+      amendmentId: z
+        .string()
+        .describe('The amendment ID to evaluate (from skill_loop_amend output)'),
+    }),
+  },
+  async ({ amendmentId }) => {
+    const projectRoot = getProjectRoot();
+    const config = await loadConfig(projectRoot);
+    const telemetryDir = join(projectRoot, config.telemetryDir);
+
+    const evaluator = new Evaluator(projectRoot, telemetryDir, config);
+    const result = await evaluator.evaluate(amendmentId);
+
+    const lines = [
+      `Amendment: ${amendmentId.slice(0, 8)}`,
+      `Baseline:  ${(result.baselineScore * 100).toFixed(1)}%`,
+      `Score:     ${(result.evaluationScore * 100).toFixed(1)}%`,
+      `Evidence:  ${result.evaluationRunCount} runs`,
+      `Result:    ${result.passed ? 'ACCEPTED' : 'REJECTED'}`,
+      `Reason:    ${result.reason}`,
+    ];
+
+    if (result.passed) {
+      lines.push('', 'Review the amendment branch and merge when ready.');
+    }
+
+    return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+  }
+);
+
+// ─── Tool: skill_loop_amendments ──────────────────────────────────
+
+server.registerTool(
+  'skill_loop_amendments',
+  {
+    title: 'List Amendments',
+    description:
+      'List all proposed, accepted, rejected, and rolled-back amendments. Shows the amendment history for tracking skill improvements over time.',
+    inputSchema: z.object({
+      status: z
+        .enum(['proposed', 'evaluating', 'accepted', 'rejected', 'rolled_back'])
+        .optional()
+        .describe('Filter by amendment status'),
+    }),
+  },
+  async ({ status }) => {
+    const projectRoot = getProjectRoot();
+    const config = await loadConfig(projectRoot);
+    const telemetryDir = join(projectRoot, config.telemetryDir);
+
+    let amendments = await readJsonl<Amendment>(
+      join(telemetryDir, 'amendments.jsonl')
+    );
+
+    if (status) {
+      amendments = amendments.filter((a) => a.status === status);
+    }
+
+    if (amendments.length === 0) {
+      return {
+        content: [
+          { type: 'text' as const, text: 'No amendments found.' },
+        ],
+      };
+    }
+
+    const output = amendments.map((a) => ({
+      id: a.id.slice(0, 8),
+      skill: a.skillId.slice(0, 8),
+      changeType: a.changeType,
+      status: a.status,
+      reason: a.reason,
+      branch: a.branchName,
+      proposedAt: a.proposedAt,
+      evaluationScore: a.evaluationScore,
+      baselineScore: a.baselineScore,
+    }));
+
+    return {
+      content: [
+        { type: 'text' as const, text: JSON.stringify(output, null, 2) },
+      ],
+    };
   }
 );
 

@@ -26,15 +26,21 @@ async function main() {
       await inspectCommand(projectRoot, args);
       break;
     }
-    case 'amend':
-      console.log('skill-loop: amend not yet implemented (Phase 3)');
+    case 'amend': {
+      const { amendCommand } = await import('./commands/amend.js');
+      await amendCommand(projectRoot, args);
       break;
-    case 'evaluate':
-      console.log('skill-loop: evaluate not yet implemented (Phase 3)');
+    }
+    case 'evaluate': {
+      const { evaluateCommand } = await import('./commands/evaluate.js');
+      await evaluateCommand(projectRoot, args);
       break;
-    case 'rollback':
-      console.log('skill-loop: rollback not yet implemented (Phase 3)');
+    }
+    case 'rollback': {
+      const { rollbackCommand } = await import('./commands/rollback.js');
+      await rollbackCommand(projectRoot, args);
       break;
+    }
     case 'gc':
       console.log('skill-loop: gc not yet implemented (Phase 4)');
       break;
