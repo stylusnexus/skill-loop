@@ -70,7 +70,22 @@ That's it. From that point forward:
 - No CLI commands to remember, no cron jobs to set up
 - Works with Claude Code, Cursor, Windsurf, and any MCP-compatible tool
 
-**Available MCP tools:**
+**Just talk to it.** The unified `skill_loop` tool understands natural language:
+
+| You say | What happens |
+|---------|-------------|
+| `skill-loop scan` | Scans your project for SKILL.md files and registers them |
+| `skill-loop status` | Shows health dashboard: skill count, runs, failure rate |
+| `skill-loop review` | Analyzes all skills for failure patterns, staleness, and trends |
+| `skill-loop fix` | Proposes amendments for broken skills (creates a git branch) |
+| `skill-loop fix --dry-run` | Preview fixes without modifying anything |
+| `skill-loop list` | Shows all registered skills with metadata |
+| `skill-loop runs` | Shows recent skill run activity |
+| `skill-loop history` | Lists past amendments and their status |
+| `skill-loop update` | Re-scans the skill registry after changes |
+| `skill-loop gc` | Prunes old run data |
+
+You can also use the individual MCP tools programmatically:
 
 | Tool | Description |
 |------|-------------|
