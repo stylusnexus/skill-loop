@@ -13,6 +13,8 @@ function printUsage() {
   console.log('  rollback   Revert an accepted amendment');
   console.log('  log        Manually log a skill run');
   console.log('  gc         Prune old runs');
+  console.log('  sessions   Show active detection sessions');
+  console.log('  detect     Dry-run detection against a tool call');
   console.log('  doctor     Audit data integrity');
   console.log('  sync       Flush events to sync plugins');
   console.log('  serve      Start MCP server (stdio)');
@@ -65,6 +67,16 @@ async function main() {
     case 'gc': {
       const { gcCommand } = await import('./commands/gc.js');
       await gcCommand(projectRoot);
+      break;
+    }
+    case 'sessions': {
+      const { sessionsCommand } = await import('./commands/sessions.js');
+      await sessionsCommand(projectRoot);
+      break;
+    }
+    case 'detect': {
+      const { detectCommand } = await import('./commands/detect.js');
+      await detectCommand(projectRoot, args);
       break;
     }
     case 'doctor': {

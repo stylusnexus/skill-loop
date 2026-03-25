@@ -12,6 +12,9 @@ import {
   loadConfig,
   readJson,
   readJsonl,
+  listSessions,
+  computeDetectionStats,
+  dryRunDetect,
 } from '@stylusnexus/skill-loop';
 import type {
   SkillRegistry,
@@ -19,10 +22,31 @@ import type {
   RunOutcome,
   RunsIndex,
   Amendment,
+  DetectionMethod,
 } from '@stylusnexus/skill-loop';
 import { join } from 'node:path';
-import { stat } from 'node:fs/promises';
+import { stat, readFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
+
+type HookStatus = 'configured' | 'outdated' | 'missing';
+
+async function checkHookStatus(projectRoot: string): Promise<HookStatus> {
+  const settingsPath = join(projectRoot, '.claude', 'settings.json');
+  try {
+    const raw = await readFile(settingsPath, 'utf-8');
+    const settings = JSON.parse(raw);
+    const preHooks: any[] = settings?.hooks?.PreToolUse ?? [];
+    const postHooks: any[] = settings?.hooks?.PostToolUse ?? [];
+    const hasPre = preHooks.some((h: any) => h.command?.includes('skill-loop-claude'));
+    const hasPost = postHooks.some((h: any) => h.command?.includes('skill-loop-claude'));
+    if (!hasPre || !hasPost) return 'missing';
+    const preEntry = preHooks.find((h: any) => h.command?.includes('skill-loop-claude'));
+    if (preEntry?.matcher === 'Skill') return 'outdated';
+    return 'configured';
+  } catch {
+    return 'missing';
+  }
+}
 
 const server = new McpServer({
   name: 'skill-loop',
@@ -45,7 +69,7 @@ server.registerTool(
       action: z
         .string()
         .describe(
-          'What to do. Examples: "scan" (initialize/re-scan skills), "status" (health dashboard), "review" or "inspect" (analyze patterns and flag issues), "fix" or "amend" (propose fixes for broken skills), "update" (re-scan skill registry), "history" or "amendments" (list past amendments), "runs" (show recent runs), "list" (show all skills), "gc" (prune old data)'
+          'What to do. Examples: "scan" (initialize/re-scan skills), "status" (health dashboard), "review" or "inspect" (analyze patterns and flag issues), "fix" or "amend" (propose fixes for broken skills), "update" (re-scan skill registry), "history" or "amendments" (list past amendments), "runs" (show recent runs), "list" (show all skills), "detection" (detection stats and active sessions), "gc" (prune old data)'
         ),
       skillName: z
         .string()
@@ -86,6 +110,20 @@ server.registerTool(
       for (const skill of result.skills) {
         lines.push(`  ${skill.type}: ${skill.name} (${skill.referencedFiles.length} file refs, ${skill.referencedTools.length} tool refs)`);
       }
+
+      // Check if auto-detection hooks are configured
+      const hookStatus = await checkHookStatus(projectRoot);
+      if (hookStatus === 'missing') {
+        lines.push('', 'Auto-detection hooks are not configured. To enable automatic skill run tracking,');
+        lines.push('add to .claude/settings.json:');
+        lines.push('  { "hooks": { "PreToolUse": [{ "matcher": ".*", "command": "npx skill-loop-claude pre-hook" }],');
+        lines.push('    "PostToolUse": [{ "matcher": ".*", "command": "npx skill-loop-claude post-hook" }] } }');
+        lines.push('Or run `npx skill-loop init` interactively to set this up.');
+      } else if (hookStatus === 'outdated') {
+        lines.push('', 'Auto-detection hooks use the old "Skill" matcher. Update matcher to ".*" in .claude/settings.json for full auto-detection.');
+        lines.push('Or run `npx skill-loop init` to upgrade automatically.');
+      }
+
       return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
     }
 
@@ -209,7 +247,9 @@ server.registerTool(
 
       const lines = recent.map((r) => {
         const name = skillMap.get(r.skillId) ?? r.skillId.slice(0, 8);
-        return `${r.timestamp.slice(0, 16)} ${name}: ${r.outcome}${r.durationMs > 0 ? ` (${r.durationMs}ms)` : ''}`;
+        const method = r.detectionMethod ?? 'explicit';
+        const methodTag = method !== 'explicit' ? ` [${method}]` : '';
+        return `${r.timestamp.slice(0, 16)} ${name}: ${r.outcome}${r.durationMs > 0 ? ` (${r.durationMs}ms)` : ''}${methodTag}`;
       });
       return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
     }
@@ -221,6 +261,41 @@ server.registerTool(
       }
       const lines = registry.skills.map((s) => `  ${s.type}: ${s.name} v${s.version} — ${s.description || '(no description)'}`);
       return { content: [{ type: 'text' as const, text: `${registry.skills.length} skills:\n${lines.join('\n')}` }] };
+    }
+
+    if (['detection', 'detect', 'sessions', 'auto-detect', 'autodetect'].some((k) => normalized.includes(k))) {
+      const writer = new TelemetryWriter(telemetryDir);
+      const allRuns = await writer.getAllRuns();
+      const stats = computeDetectionStats(allRuns);
+      const sessions = await listSessions(telemetryDir);
+
+      const lines = ['Detection stats:'];
+      const total = stats.explicit + stats.read_skill_file + stats.tool_fingerprint + stats.file_overlap + stats.untracked;
+      if (total === 0) {
+        lines.push('  No runs logged yet.');
+      } else {
+        if (stats.explicit > 0) lines.push(`  Explicit (Skill tool): ${stats.explicit}`);
+        if (stats.read_skill_file > 0) lines.push(`  SKILL.md read:        ${stats.read_skill_file}`);
+        if (stats.tool_fingerprint > 0) lines.push(`  Tool fingerprint:     ${stats.tool_fingerprint}`);
+        if (stats.file_overlap > 0) lines.push(`  File overlap:         ${stats.file_overlap}`);
+        if (stats.untracked > 0) lines.push(`  Legacy (pre-detect):  ${stats.untracked}`);
+        const autoDetected = stats.read_skill_file + stats.tool_fingerprint + stats.file_overlap;
+        lines.push(`  Auto-detected: ${autoDetected}/${total} (${((autoDetected / total) * 100).toFixed(0)}%)`);
+      }
+
+      lines.push('', `Active sessions: ${sessions.length}`);
+      if (sessions.length > 0) {
+        const registry = await readJson<SkillRegistry>(join(telemetryDir, 'registry.json'));
+        const skillMap = new Map(registry?.skills.map((s) => [s.id, s.name]) ?? []);
+        for (const s of sessions) {
+          const name = skillMap.get(s.skillId) ?? s.skillId.slice(0, 8);
+          lines.push(`  ${name}: ${s.primaryMethod} (${(s.compositeConfidence * 100).toFixed(0)}% confidence)`);
+        }
+      }
+
+      lines.push('', `Config: threshold=${config.detection.confidenceThreshold}, window=${config.detection.sessionWindowMs / 1000}s, methods=${config.detection.enabledMethods.join(',')}`);
+
+      return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
     }
 
     if (['gc', 'clean', 'prune', 'cleanup'].some((k) => normalized.includes(k))) {
@@ -247,6 +322,7 @@ server.registerTool(
           '  list           — Show all registered skills',
           '  runs           — Show recent activity',
           '  history        — List past amendments',
+          '  detection      — Detection stats and active sessions',
           '  gc             — Prune old run data',
         ].join('\n'),
       }],
@@ -323,6 +399,13 @@ server.registerTool(
     if (failures > 0 && runCount > 0) {
       const failRate = ((failures / runCount) * 100).toFixed(1);
       lines.push(`Overall failure rate: ${failRate}%`);
+    }
+
+    if (runCount > 0) {
+      const allRuns = await writer.getAllRuns();
+      const stats = computeDetectionStats(allRuns);
+      const autoDetected = stats.read_skill_file + stats.tool_fingerprint + stats.file_overlap;
+      lines.push(`Auto-detected runs: ${autoDetected}/${runCount} (${((autoDetected / runCount) * 100).toFixed(0)}%)`);
     }
 
     if (skillCount > 0) {
@@ -534,6 +617,18 @@ server.registerTool(
       );
     }
 
+    const hookStatus = await checkHookStatus(projectRoot);
+    if (hookStatus === 'missing') {
+      lines.push('', 'To enable auto-detection, add hooks to .claude/settings.json:');
+      lines.push('  { "hooks": { "PreToolUse": [{ "matcher": ".*", "command": "npx skill-loop-claude pre-hook" }],');
+      lines.push('    "PostToolUse": [{ "matcher": ".*", "command": "npx skill-loop-claude post-hook" }] } }');
+      lines.push('Or run `npx skill-loop init` interactively to set this up.');
+    } else if (hookStatus === 'outdated') {
+      lines.push('', 'Hooks detected but using old "Skill" matcher. Update to ".*" for full auto-detection.');
+    } else {
+      lines.push('', 'Auto-detection hooks are configured.');
+    }
+
     return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
   }
 );
@@ -555,6 +650,10 @@ server.registerTool(
         .enum(['success', 'failure', 'partial', 'unknown'])
         .optional()
         .describe('Filter by outcome'),
+      detectionMethod: z
+        .enum(['explicit', 'read_skill_file', 'tool_fingerprint', 'file_overlap'])
+        .optional()
+        .describe('Filter by detection method (e.g., "explicit" for manual, "read_skill_file" for auto-detected)'),
       limit: z
         .number()
         .optional()
@@ -562,7 +661,7 @@ server.registerTool(
         .describe('Max number of runs to return (default 20)'),
     }),
   },
-  async ({ skillName, outcome, limit }) => {
+  async ({ skillName, outcome, detectionMethod, limit }) => {
     const projectRoot = getProjectRoot();
     const config = await loadConfig(projectRoot);
     const telemetryDir = join(projectRoot, config.telemetryDir);
@@ -594,6 +693,10 @@ server.registerTool(
       runs = runs.filter((r) => r.outcome === outcome);
     }
 
+    if (detectionMethod) {
+      runs = runs.filter((r) => (r.detectionMethod ?? 'explicit') === detectionMethod);
+    }
+
     // Most recent first, limited
     const recent = runs.reverse().slice(0, limit ?? 20);
 
@@ -612,6 +715,8 @@ server.registerTool(
       durationMs: r.durationMs,
       errorType: r.errorType,
       taskContext: r.taskContext,
+      detectionMethod: r.detectionMethod ?? 'explicit',
+      detectionConfidence: r.detectionConfidence ?? 1.0,
     }));
 
     return {

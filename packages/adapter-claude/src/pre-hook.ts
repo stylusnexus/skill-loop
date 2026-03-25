@@ -1,60 +1,40 @@
-import { writeFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { randomUUID } from 'node:crypto';
-
-interface HookInput {
-  tool_name: string;
-  tool_input: {
-    skill?: string;
-    [key: string]: unknown;
-  };
-}
-
-interface PendingContext {
-  runId: string;
-  skillName: string;
-  startedAt: string;
-  taskContext: string;
-}
+import { DetectionPipeline, loadConfig } from '@stylusnexus/skill-loop';
+import type { PreEvent } from '@stylusnexus/skill-loop';
 
 export async function preHook(): Promise<void> {
   const input = await readStdin();
   if (!input) return;
 
-  let hookInput: HookInput;
+  let hookInput: { tool_name: string; tool_input: Record<string, unknown>; session_id?: string };
   try {
     hookInput = JSON.parse(input);
   } catch {
     return;
   }
 
-  if (hookInput.tool_name !== 'Skill') return;
+  const projectRoot = process.cwd();
+  const config = await loadConfig(projectRoot);
+  const telemetryDir = join(projectRoot, config.telemetryDir);
 
-  const skillName = hookInput.tool_input?.skill;
-  if (!skillName) return;
-
-  const pendingDir = join(process.cwd(), '.skill-telemetry', '.pending');
-  await mkdir(pendingDir, { recursive: true });
-
-  const runId = randomUUID();
-  const context: PendingContext = {
-    runId,
-    skillName,
-    startedAt: new Date().toISOString(),
-    taskContext: typeof hookInput.tool_input === 'object'
-      ? JSON.stringify(hookInput.tool_input).slice(0, 200)
-      : '',
+  const event: PreEvent = {
+    tool_name: hookInput.tool_name,
+    tool_input: hookInput.tool_input ?? {},
+    session_id: hookInput.session_id,
   };
 
-  await writeFile(join(pendingDir, `${runId}.json`), JSON.stringify(context));
+  const pipeline = new DetectionPipeline(projectRoot, telemetryDir, config.detection);
+  await pipeline.handlePreEvent(event);
 }
 
 function readStdin(): Promise<string> {
   return new Promise((resolve) => {
     let data = '';
+    let resolved = false;
+    const done = () => { if (!resolved) { resolved = true; resolve(data); } };
     process.stdin.setEncoding('utf-8');
     process.stdin.on('data', (chunk) => { data += chunk; });
-    process.stdin.on('end', () => resolve(data));
-    setTimeout(() => resolve(data), 1000);
+    process.stdin.on('end', done);
+    setTimeout(done, 1000);
   });
 }

@@ -12,7 +12,7 @@ SKILL --> RUN --> OBSERVE --> INSPECT --> FIX
 
 ## What it does
 
-1. **Observe** -- Automatically logs every skill invocation: what ran, whether it succeeded, and how the user reacted
+1. **Observe** -- Automatically detects and logs skill usage via tiered confidence scoring — no explicit logging required
 2. **Inspect** -- Detects failure patterns, staleness (dead file references), routing errors, and usage trends
 3. **Amend** -- Proposes targeted SKILL.md patches grounded in evidence from past runs
 4. **Evaluate** -- Tests amendments against recent failure cases on a git branch before any human sees a PR
@@ -83,6 +83,7 @@ That's it. From that point forward:
 | `skill-loop runs` | Shows recent skill run activity |
 | `skill-loop history` | Lists past amendments and their status |
 | `skill-loop update` | Re-scans the skill registry after changes |
+| `skill-loop detection` | Shows detection stats and active sessions |
 | `skill-loop gc` | Prunes old run data |
 
 You can also use the individual MCP tools programmatically:
@@ -130,24 +131,36 @@ For automatic skill run tracking in Claude Code, install the adapter:
 npm install @stylusnexus/skill-loop @stylusnexus/skill-loop-claude
 ```
 
-Add hooks to `.claude/settings.json`:
+Then run init — it will offer to configure hooks for you:
+
+```bash
+npx skill-loop init
+# ...
+# Auto-detection hooks are not configured.
+# These hooks observe tool calls and automatically log skill usage.
+# Add auto-detection hooks to .claude/settings.json? [Y/n]
+```
+
+Say yes and it adds the hooks to `.claude/settings.json` automatically. If you prefer to set them up manually:
 
 ```json
 {
   "hooks": {
     "PreToolUse": [{
-      "matcher": "Skill",
+      "matcher": ".*",
       "command": "npx skill-loop-claude pre-hook"
     }],
     "PostToolUse": [{
-      "matcher": "Skill",
+      "matcher": ".*",
       "command": "npx skill-loop-claude post-hook"
     }]
   }
 }
 ```
 
-Every skill invocation is logged to `.skill-telemetry/runs.jsonl` (gitignored, local-only). No data leaves your machine unless you configure a sync plugin.
+The hooks observe all tool calls and auto-detect skill usage via tiered confidence scoring — no explicit `Skill` tool invocation required. Runs are logged to `.skill-telemetry/runs.jsonl` (gitignored, local-only). No data leaves your machine unless you configure a sync plugin.
+
+If you previously had hooks with `"matcher": "Skill"`, running `npx skill-loop init` again will detect the old config and offer to upgrade to `".*"` for full auto-detection.
 
 ## How it works
 
@@ -161,9 +174,18 @@ skill-loop reads SKILL.md files from your configured paths (default: `.claude/sk
 
 Each skill gets a stable UUID that persists across rescans.
 
-### 2. Log every run
+### 2. Detect and log runs automatically
 
-When a skill executes, a run record is appended to `runs.jsonl`:
+skill-loop auto-detects skill usage via a tiered confidence scoring system. Every tool call is evaluated against multiple signals:
+
+| Signal | Confidence | Description |
+|--------|------------|-------------|
+| `Skill` tool invoked explicitly | 1.0 | Direct invocation via the Skill tool |
+| `Read` of a registered SKILL.md | 0.9 | Agent reads a skill file before executing |
+| Tool call matches `triggerPatterns` + `referencedTools` | 0.6 | Tool usage fingerprint matches a registered skill |
+| Files touched overlap `referencedFiles` | 0.5 | Reserved for future use |
+
+Runs are only logged when composite confidence exceeds a configurable threshold (default: 0.6). Each run record includes detection metadata:
 
 ```json
 {
@@ -174,7 +196,9 @@ When a skill executes, a run record is appended to `runs.jsonl`:
   "platform": "claude",
   "outcome": "success",
   "durationMs": 1234,
-  "taskContext": "refactor auth module"
+  "taskContext": "refactor auth module",
+  "detectionMethod": "read_skill_file",
+  "detectionConfidence": 0.9
 }
 ```
 
@@ -211,9 +235,26 @@ Create `skill-loop.config.json` in your project root (all fields optional):
   },
   "retention": {
     "maxRunAgeDays": 90
+  },
+  "detection": {
+    "enabled": true,
+    "confidenceThreshold": 0.6,
+    "sessionWindowMs": 300000,
+    "enabledMethods": ["explicit", "read_skill_file", "tool_fingerprint"]
   }
 }
 ```
+
+### Detection tuning
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `detection.enabled` | `true` | Master switch for auto-detection |
+| `detection.confidenceThreshold` | `0.6` | Minimum composite score to log a run |
+| `detection.sessionWindowMs` | `300000` | How long (ms) a detection session stays open |
+| `detection.enabledMethods` | `["explicit", "read_skill_file", "tool_fingerprint"]` | Which detection methods are active |
+| `detection.confidenceWeights` | `{ explicit: 1.0, read_skill_file: 0.9, tool_fingerprint: 0.6, file_overlap: 0.5 }` | Confidence per method |
+| `detection.logBelowThreshold` | `false` | Log sub-threshold detections to `runs-debug.jsonl` for tuning |
 
 ## CLI Reference
 
@@ -232,6 +273,8 @@ npx skill-loop <command> # Run a command
 | `evaluate <id>` | Test a proposed amendment against recent failures |
 | `rollback <id>` | Revert a merged amendment via `git revert` |
 | `gc` | Prune runs older than `maxRunAgeDays` |
+| `sessions` | Show active detection sessions |
+| `detect <tool> [k=v]` | Dry-run detection against a hypothetical tool call |
 | `doctor` | Audit cross-file referential integrity |
 | `sync` | Push buffered events to external services |
 | `serve` | Start MCP server (stdio) |
@@ -243,9 +286,10 @@ All data lives in `.skill-telemetry/` (gitignored):
 | File | Format | Purpose |
 |------|--------|---------|
 | `registry.json` | JSON | Skill definitions with stable UUIDs |
-| `runs.jsonl` | JSONL (append-only) | Every skill run with outcome and context |
+| `runs.jsonl` | JSONL (append-only) | Every skill run with outcome, context, and detection metadata |
 | `runs-index.json` | JSON (derived) | Compact index for fast queries |
 | `amendments.jsonl` | JSONL (append-only) | Proposed and applied skill changes |
+| `.sessions/` | JSON (ephemeral) | Active detection sessions, auto-pruned on TTL expiry |
 
 Safe to delete: cache files, sync queue. Loses history: runs, amendments.
 

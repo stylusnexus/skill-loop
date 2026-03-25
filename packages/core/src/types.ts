@@ -59,12 +59,53 @@ export interface SkillRun {
   durationMs: number;
   /** Set if running under an evaluation */
   amendmentId?: string;
+  /** How this run was detected. Defaults to 'explicit' for backward compat. */
+  detectionMethod?: DetectionMethod;
+  /** 0.0–1.0. Defaults to 1.0 for backward compat. */
+  detectionConfidence?: number;
+  /** All signals that contributed to detection. */
+  detectionSignals?: DetectionSignal[];
 }
 
 export type Platform = 'claude' | 'codex' | 'copilot' | 'cli';
 export type RunOutcome = 'success' | 'failure' | 'partial' | 'unknown';
 export type ErrorType = 'tool_not_found' | 'stale_reference' | 'wrong_routing' | 'runtime_error';
 export type UserFeedback = 'positive' | 'negative' | 'correction';
+
+// ─── Detection ────────────────────────────────────────────────────
+
+export type DetectionMethod =
+  | 'explicit'
+  | 'read_skill_file'
+  | 'tool_fingerprint'
+  | 'file_overlap';
+
+export interface DetectionSignal {
+  method: DetectionMethod;
+  confidence: number;
+  skillId: string;
+  evidence: string;
+}
+
+export interface DetectedSkillRun {
+  signals: DetectionSignal[];
+  primarySignal: DetectionSignal;
+  compositeConfidence: number;
+}
+
+export interface DetectionSession {
+  sessionId: string;
+  skillId: string;
+  skillVersion: number;
+  openedAt: string;
+  lastActivityAt: string;
+  runId: string;
+  startedAt: string;
+  primaryMethod: DetectionMethod;
+  compositeConfidence: number;
+  taskContext: string;
+  signals: DetectionSignal[];
+}
 
 // ─── Runs Index (derived, rebuildable) ────────────────────────────
 
@@ -194,6 +235,21 @@ export type SyncEvent =
 
 // ─── Configuration ────────────────────────────────────────────────
 
+export interface DetectionConfig {
+  /** Master switch. Default: true */
+  enabled: boolean;
+  /** Minimum composite confidence to log a run. Default: 0.6 */
+  confidenceThreshold: number;
+  /** Session window in milliseconds. Default: 300000 (5 minutes) */
+  sessionWindowMs: number;
+  /** Confidence weights per detection method */
+  confidenceWeights: Record<DetectionMethod, number>;
+  /** Which detection methods are active */
+  enabledMethods: DetectionMethod[];
+  /** When true, writes sub-threshold detections to runs-debug.jsonl */
+  logBelowThreshold: boolean;
+}
+
 export interface SkillLoopConfig {
   schemaVersion: number;
   skillPaths: string[];
@@ -214,6 +270,7 @@ export interface SkillLoopConfig {
     /** If true, taskContext and errorDetail are sent to sync plugins. Default: false (redacted). */
     allowSensitiveFields: boolean;
   };
+  detection: DetectionConfig;
   parser: ParserConfig;
 }
 
