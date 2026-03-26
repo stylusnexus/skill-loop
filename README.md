@@ -13,7 +13,7 @@ SKILL --> RUN --> OBSERVE --> INSPECT --> FIX
 ## What it does
 
 1. **Observe** -- Automatically detects and logs skill usage via tiered confidence scoring — no explicit logging required
-2. **Inspect** -- Detects failure patterns, staleness (dead file references), routing errors, and usage trends
+2. **Inspect** -- Detects failure patterns, staleness (dead file references), content drift, routing errors, and usage trends
 3. **Amend** -- Proposes targeted SKILL.md patches grounded in evidence from past runs
 4. **Evaluate** -- Tests amendments against recent failure cases on a git branch before any human sees a PR
 5. **Update/Rollback** -- Merges improvements via PR; rolls back if post-merge monitoring shows regression
@@ -210,12 +210,13 @@ The inspector analyzes run history to find:
 - Skills with high failure rates
 - Skills that get selected for wrong tasks (negative feedback)
 - Stale references to files/tools that no longer exist
+- **Content drift** — referenced directories have changed significantly since the skill was last modified, suggesting the skill's domain knowledge may be outdated
 - Dead skills with zero recent invocations
 
 ### 4. Fix automatically
 
 When a pattern is detected, the amender:
-1. Drafts a targeted SKILL.md patch
+1. Drafts a targeted SKILL.md patch (fix broken references, tighten triggers, add failure context, or flag content drift)
 2. Creates a git branch
 3. Evaluates the amendment against recent failures
 4. Opens a PR with evaluation results if it improves things
