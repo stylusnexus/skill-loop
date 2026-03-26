@@ -8,6 +8,8 @@ import {
   branchExists,
   getLatestCommit,
   deleteBranch,
+  countCommitsSince,
+  getParentDirs,
 } from '../git.js';
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -97,5 +99,50 @@ describe('Git Operations', () => {
     const result = await deleteBranch(dir, 'to-delete');
     expect(result.success).toBe(true);
     expect(await branchExists(dir, 'to-delete')).toBe(false);
+  });
+
+  it('counts commits since a date for given paths', async () => {
+    // Create a subdirectory with commits
+    await mkdir(join(dir, 'src', 'lib'), { recursive: true });
+    const before = new Date().toISOString();
+
+    await writeFile(join(dir, 'src', 'lib', 'a.ts'), 'export const a = 1;');
+    await exec('git', ['add', '.'], { cwd: dir });
+    await exec('git', ['commit', '-m', 'add a'], { cwd: dir });
+
+    await writeFile(join(dir, 'src', 'lib', 'b.ts'), 'export const b = 2;');
+    await exec('git', ['add', '.'], { cwd: dir });
+    await exec('git', ['commit', '-m', 'add b'], { cwd: dir });
+
+    const count = await countCommitsSince(dir, before, ['src/lib']);
+    expect(count).toBe(2);
+
+    // Unrelated path should return 0
+    const unrelated = await countCommitsSince(dir, before, ['other/dir']);
+    expect(unrelated).toBe(0);
+  });
+
+  it('returns 0 for countCommitsSince with empty paths', async () => {
+    const count = await countCommitsSince(dir, new Date().toISOString(), []);
+    expect(count).toBe(0);
+  });
+});
+
+describe('getParentDirs', () => {
+  it('extracts unique parent directories', () => {
+    const dirs = getParentDirs([
+      'src/lib/world/layout.ts',
+      'src/lib/world/mask.ts',
+      'src/lib/map/renderer/zone.ts',
+      'src/lib/map/renderer/biome.ts',
+      'standalone.ts',
+    ]);
+    expect(dirs).toContain('src/lib/world');
+    expect(dirs).toContain('src/lib/map/renderer');
+    expect(dirs).toHaveLength(2); // standalone.ts has no parent dir
+  });
+
+  it('returns empty for no paths', () => {
+    expect(getParentDirs([])).toEqual([]);
   });
 });

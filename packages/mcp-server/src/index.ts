@@ -179,7 +179,8 @@ server.registerTool(
       const lines = [`Analyzed ${result.skillCount} skills, ${result.totalRuns} runs in window\n`];
       for (const p of result.patterns) {
         const name = skillMap.get(p.skillId) ?? p.skillId.slice(0, 8);
-        lines.push(`  ${name}: ${p.totalRuns} runs, ${(p.failureRate * 100).toFixed(0)}% fail, ${(p.stalenessScore * 100).toFixed(0)}% stale, ${p.trend}`);
+        const driftInfo = p.driftScore > 0 ? `, ${p.driftScore} drift commits` : '';
+        lines.push(`  ${name}: ${p.totalRuns} runs, ${(p.failureRate * 100).toFixed(0)}% fail, ${(p.stalenessScore * 100).toFixed(0)}% stale${driftInfo}, ${p.trend}`);
       }
 
       if (result.flagged.length > 0) {
@@ -780,8 +781,9 @@ server.registerTool(
       const name = skillMap.get(pattern.skillId) ?? pattern.skillId.slice(0, 8);
       const failPct = (pattern.failureRate * 100).toFixed(0);
       const stalePct = (pattern.stalenessScore * 100).toFixed(0);
+      const driftInfo = pattern.driftScore > 0 ? `, ${pattern.driftScore} drift commits` : '';
       lines.push(
-        `  ${name}: ${pattern.totalRuns} runs, ${failPct}% failures, ${stalePct}% stale, trend: ${pattern.trend}`
+        `  ${name}: ${pattern.totalRuns} runs, ${failPct}% failures, ${stalePct}% stale${driftInfo}, trend: ${pattern.trend}`
       );
     }
 

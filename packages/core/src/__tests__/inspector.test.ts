@@ -7,7 +7,11 @@ import { readJson } from '../storage.js';
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import type { SkillRun, PatternCache, SkillLoopConfig } from '../types.js';
+
+const exec = promisify(execFile);
 
 function makeRun(overrides: Partial<SkillRun> = {}): SkillRun {
   return {
@@ -161,6 +165,52 @@ describe('Inspector', () => {
 
     expect(result.patterns).toHaveLength(1);
     expect(result.patterns[0].failureRate).toBe(1);
+  });
+
+  it('detects content drift when referenced directories have new commits', async () => {
+    // Initialize a git repo so countCommitsSince works
+    await exec('git', ['init'], { cwd: dir });
+    await exec('git', ['config', 'user.email', 'test@test.com'], { cwd: dir });
+    await exec('git', ['config', 'user.name', 'Test'], { cwd: dir });
+
+    // Create the referenced file and commit it
+    await mkdir(join(dir, 'src', 'lib', 'world'), { recursive: true });
+    await writeFile(join(dir, 'src', 'lib', 'world', 'layout.ts'), 'export const x = 1;');
+
+    // Create the skill referencing that file
+    const skillId = await createSkillAndScan(
+      'map-skill',
+      'See `src/lib/world/layout.ts` for the layout service.'
+    );
+
+    // Initial commit (includes skill + referenced file)
+    await exec('git', ['add', '.'], { cwd: dir });
+    await exec('git', ['commit', '-m', 'initial'], { cwd: dir });
+
+    // Now make commits to the referenced directory AFTER the skill was last modified
+    await writeFile(join(dir, 'src', 'lib', 'world', 'mask.ts'), 'export const mask = true;');
+    await exec('git', ['add', '.'], { cwd: dir });
+    await exec('git', ['commit', '-m', 'add mask generator'], { cwd: dir });
+
+    await writeFile(join(dir, 'src', 'lib', 'world', 'layout.ts'), 'export const x = 2; // updated');
+    await exec('git', ['add', '.'], { cwd: dir });
+    await exec('git', ['commit', '-m', 'update layout'], { cwd: dir });
+
+    // Backdate the skill's lastModified in the registry so drift is detected
+    const { readFile: rf } = await import('node:fs/promises');
+    const registryPath = join(telemetryDir, 'registry.json');
+    const registry2 = JSON.parse(await rf(registryPath, 'utf-8'));
+    const skill2 = registry2.skills.find((s: any) => s.name === 'map-skill');
+    skill2.lastModified = new Date(Date.now() - 86_400_000).toISOString(); // 1 day ago
+    await writeFile(registryPath, JSON.stringify(registry2));
+
+    const inspector = new Inspector(dir, telemetryDir, config);
+    const result = await inspector.inspect('map-skill');
+
+    // Should detect drift commits
+    expect(result.patterns[0].driftScore).toBeGreaterThan(0);
+    expect(result.flagged.length).toBeGreaterThan(0);
+    expect(result.flagged[0].reasons.some(r => r.includes('Content drift'))).toBe(true);
   });
 
   it('detects degrading trend', async () => {

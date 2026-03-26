@@ -10,6 +10,7 @@ import type {
   SkillLoopConfig,
 } from './types.js';
 import { readJson, writeJsonAtomic, readJsonl } from './storage.js';
+import { countCommitsSince, getParentDirs } from './git.js';
 
 export interface InspectResult {
   timestamp: string;
@@ -91,8 +92,11 @@ export class Inspector {
         }
       }
 
-      // Staleness score
+      // Staleness score (broken references)
       const stalenessScore = await this.computeStaleness(skill);
+
+      // Content drift score (codebase evolved but skill not updated)
+      const driftScore = await this.computeDrift(skill);
 
       // Last run
       const lastRun = skillRuns.length > 0
@@ -109,6 +113,7 @@ export class Inspector {
         negativeFeedbackRate,
         dominantErrorType,
         stalenessScore,
+        driftScore,
         lastRunAt: lastRun?.timestamp ?? '',
         trend,
       };
@@ -125,6 +130,9 @@ export class Inspector {
       if (stalenessScore > 0.5) {
         reasons.push(`Staleness score ${stalenessScore.toFixed(2)} — ${skill.brokenReferences.length} broken references`);
       }
+      if (driftScore > 0) {
+        reasons.push(`Content drift detected — ${driftScore} commit(s) in referenced directories since skill was last modified`);
+      }
       if (totalRuns === 0) {
         const lastModified = new Date(skill.lastModified);
         const daysSinceModified = (now.getTime() - lastModified.getTime()) / (24 * 60 * 60 * 1000);
@@ -140,6 +148,7 @@ export class Inspector {
         const severity: 'low' | 'medium' | 'high' =
           failureRate >= 0.5 || stalenessScore >= 0.8 ? 'high' :
           failureRate >= this.config.thresholds.failureRateAlert || stalenessScore > 0.5 ? 'medium' :
+          driftScore >= 10 ? 'medium' :
           'low';
         flagged.push({ skillId: skill.id, skillName: skill.name, reasons, severity });
       }
@@ -202,6 +211,21 @@ export class Inspector {
     }
 
     return total > 0 ? broken / total : 0;
+  }
+
+  /**
+   * Compute content drift: count commits in referenced file directories
+   * since the skill was last modified. High counts mean the codebase has
+   * evolved but the skill hasn't been updated to reflect changes.
+   * Returns raw commit count (0 = no drift).
+   */
+  private async computeDrift(skill: SkillRecord): Promise<number> {
+    if (skill.referencedFiles.length === 0) return 0;
+
+    const dirs = getParentDirs(skill.referencedFiles);
+    if (dirs.length === 0) return 0;
+
+    return countCommitsSince(this.projectRoot, skill.lastModified, dirs);
   }
 
   /**

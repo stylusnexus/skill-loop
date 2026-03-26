@@ -127,6 +127,7 @@ export class Amender {
     const hasHighFailure = flag.reasons.some(r => r.includes('Failure rate'));
     const hasBadRouting = flag.reasons.some(r => r.includes('Negative feedback'));
     const isDegrading = flag.reasons.some(r => r.includes('degrading'));
+    const hasDrift = flag.reasons.some(r => r.includes('Content drift'));
 
     let changeType: AmendmentChangeType;
     let proposedContent: string;
@@ -137,6 +138,12 @@ export class Amender {
       changeType = 'reference';
       reason = `${skill.brokenReferences.length} referenced file(s) no longer exist: ${skill.brokenReferences.join(', ')}`;
       proposedContent = this.fixBrokenReferences(originalContent, skill.brokenReferences);
+    } else if (hasDrift) {
+      // Flag drift: add a warning banner so the user knows to review
+      changeType = 'content_drift';
+      const driftReason = flag.reasons.find(r => r.includes('Content drift')) ?? 'Content drift detected';
+      reason = driftReason;
+      proposedContent = this.addDriftWarning(originalContent, driftReason);
     } else if (hasBadRouting) {
       // Tighten the trigger/description
       changeType = 'trigger';
@@ -302,6 +309,27 @@ export class Amender {
     ].join('\n');
 
     return content.trimEnd() + '\n' + section;
+  }
+
+  /**
+   * Add a drift warning to the skill. The skill's referenced directories
+   * have changed significantly since the skill was last modified.
+   */
+  private addDriftWarning(content: string, driftReason: string): string {
+    // Idempotency: replace existing drift warning if present
+    const driftMarker = '> **Content drift warning';
+    if (content.includes(driftMarker)) {
+      content = content.replace(/\n> \*\*Content drift warning[^\n]*\n/g, '');
+    }
+
+    // Insert after frontmatter
+    const frontmatterEnd = content.indexOf('---', content.indexOf('---') + 3);
+    if (frontmatterEnd === -1) return content;
+
+    const insertPoint = content.indexOf('\n', frontmatterEnd) + 1;
+    const warning = `\n> **Content drift warning (auto-detected by skill-loop):** ${driftReason}. Review and update this skill's domain knowledge, then re-save to reset the drift clock.\n`;
+
+    return content.slice(0, insertPoint) + warning + content.slice(insertPoint);
   }
 
   /**

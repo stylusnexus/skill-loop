@@ -101,3 +101,30 @@ export async function diffFile(cwd: string, filePath: string): Promise<string> {
   const result = await git(cwd, 'diff', 'HEAD', '--', filePath);
   return result.stdout;
 }
+
+/**
+ * Count commits touching the given paths since a date.
+ * Returns 0 if git is unavailable or paths have no history.
+ */
+export async function countCommitsSince(cwd: string, sinceISO: string, paths: string[]): Promise<number> {
+  if (paths.length === 0) return 0;
+  const result = await git(cwd, 'rev-list', '--count', `--since=${sinceISO}`, 'HEAD', '--', ...paths);
+  if (!result.success) return 0;
+  const count = parseInt(result.stdout, 10);
+  return Number.isNaN(count) ? 0 : count;
+}
+
+/**
+ * Get unique parent directories from a list of file paths.
+ * Used to detect drift in directories containing referenced files.
+ */
+export function getParentDirs(filePaths: string[]): string[] {
+  const dirs = new Set<string>();
+  for (const fp of filePaths) {
+    const lastSlash = fp.lastIndexOf('/');
+    if (lastSlash > 0) {
+      dirs.add(fp.slice(0, lastSlash));
+    }
+  }
+  return [...dirs];
+}

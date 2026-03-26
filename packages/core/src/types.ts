@@ -159,7 +159,7 @@ export interface Amendment {
   rollbackAt?: string;
 }
 
-export type AmendmentChangeType = 'trigger' | 'instruction' | 'reference' | 'output_format' | 'guard';
+export type AmendmentChangeType = 'trigger' | 'instruction' | 'reference' | 'output_format' | 'guard' | 'content_drift';
 export type AmendmentStatus = 'proposed' | 'evaluating' | 'accepted' | 'rejected' | 'rolled_back';
 
 export interface EvidenceSummary {
@@ -183,6 +183,8 @@ export interface SkillPattern {
   negativeFeedbackRate: number;
   dominantErrorType?: ErrorType;
   stalenessScore: number;
+  /** Number of commits in referenced directories since skill was last modified */
+  driftScore: number;
   lastRunAt: string;
   trend: 'improving' | 'stable' | 'degrading' | 'insufficient_data';
 }
