@@ -23,4 +23,5 @@ skill-loop.code-workspace
 
 docs
 CLAUDE.md
-.claude/auto-memory/dirty-files
+.claude/auto-memory/*
+docs/*
