@@ -126,34 +126,21 @@ async function offerHookSetup(projectRoot: string): Promise<void> {
     // No settings file yet
   }
 
-  // Check if hooks are already configured
+  // Check if hooks are already configured (support both old and new format)
   const hooks = settings.hooks ?? {};
   const preHooks: any[] = hooks.PreToolUse ?? [];
   const postHooks: any[] = hooks.PostToolUse ?? [];
 
-  const hasPreHook = preHooks.some((h: any) => h.command?.includes('skill-loop-claude'));
-  const hasPostHook = postHooks.some((h: any) => h.command?.includes('skill-loop-claude'));
+  const findHookEntry = (entries: any[]) => entries.find((h: any) =>
+    h.command?.includes('skill-loop-claude') ||
+    h.hooks?.some?.((sub: any) => sub.command?.includes('skill-loop-claude'))
+  );
+
+  const hasPreHook = !!findHookEntry(preHooks);
+  const hasPostHook = !!findHookEntry(postHooks);
 
   if (hasPreHook && hasPostHook) {
-    // Check if using old "Skill" matcher vs new ".*" matcher
-    const preEntry = preHooks.find((h: any) => h.command?.includes('skill-loop-claude'));
-    const postEntry = postHooks.find((h: any) => h.command?.includes('skill-loop-claude'));
-    const isOldMatcher = preEntry?.matcher === 'Skill' || postEntry?.matcher === 'Skill';
-
-    if (isOldMatcher) {
-      console.log('\nClaude Code hooks are configured but using the old "Skill" matcher.');
-      console.log('Auto-detection requires the ".*" matcher to observe all tool calls.');
-      const answer = await ask('Upgrade hook matchers to ".*" for auto-detection? [Y/n] ');
-      if (answer.toLowerCase() !== 'n') {
-        preEntry.matcher = '.*';
-        postEntry.matcher = '.*';
-        await mkdir(join(projectRoot, '.claude'), { recursive: true });
-        await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
-        console.log('Updated hooks to use ".*" matcher for auto-detection.');
-      }
-    } else {
-      console.log('\nClaude Code hooks already configured for auto-detection.');
-    }
+    console.log('\nClaude Code hooks already configured for auto-detection.');
     return;
   }
 
@@ -173,11 +160,11 @@ async function offerHookSetup(projectRoot: string): Promise<void> {
 
   settings.hooks.PreToolUse.push({
     matcher: '.*',
-    command: `${hookCommand} pre-hook`,
+    hooks: [{ type: 'command', command: `${hookCommand} pre-hook` }],
   });
   settings.hooks.PostToolUse.push({
     matcher: '.*',
-    command: `${hookCommand} post-hook`,
+    hooks: [{ type: 'command', command: `${hookCommand} post-hook` }],
   });
 
   await mkdir(join(projectRoot, '.claude'), { recursive: true });

@@ -37,10 +37,14 @@ async function checkHookStatus(projectRoot: string): Promise<HookStatus> {
     const settings = JSON.parse(raw);
     const preHooks: any[] = settings?.hooks?.PreToolUse ?? [];
     const postHooks: any[] = settings?.hooks?.PostToolUse ?? [];
-    const hasPre = preHooks.some((h: any) => h.command?.includes('skill-loop-claude'));
-    const hasPost = postHooks.some((h: any) => h.command?.includes('skill-loop-claude'));
+    const findEntry = (entries: any[]) => entries.find((h: any) =>
+      h.command?.includes('skill-loop-claude') ||
+      h.hooks?.some?.((sub: any) => sub.command?.includes('skill-loop-claude'))
+    );
+    const hasPre = !!findEntry(preHooks);
+    const hasPost = !!findEntry(postHooks);
     if (!hasPre || !hasPost) return 'missing';
-    const preEntry = preHooks.find((h: any) => h.command?.includes('skill-loop-claude'));
+    const preEntry = findEntry(preHooks);
     if (preEntry?.matcher === 'Skill') return 'outdated';
     return 'configured';
   } catch {
@@ -116,8 +120,8 @@ server.registerTool(
       if (hookStatus === 'missing') {
         lines.push('', 'Auto-detection hooks are not configured. To enable automatic skill run tracking,');
         lines.push('add to .claude/settings.json:');
-        lines.push('  { "hooks": { "PreToolUse": [{ "matcher": ".*", "command": "npx skill-loop-claude pre-hook" }],');
-        lines.push('    "PostToolUse": [{ "matcher": ".*", "command": "npx skill-loop-claude post-hook" }] } }');
+        lines.push('  { "hooks": { "PreToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "npx skill-loop-claude pre-hook" }] }],');
+        lines.push('    "PostToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "npx skill-loop-claude post-hook" }] }] } }');
         lines.push('Or run `npx skill-loop init` interactively to set this up.');
       } else if (hookStatus === 'outdated') {
         lines.push('', 'Auto-detection hooks use the old "Skill" matcher. Update matcher to ".*" in .claude/settings.json for full auto-detection.');
@@ -621,8 +625,8 @@ server.registerTool(
     const hookStatus = await checkHookStatus(projectRoot);
     if (hookStatus === 'missing') {
       lines.push('', 'To enable auto-detection, add hooks to .claude/settings.json:');
-      lines.push('  { "hooks": { "PreToolUse": [{ "matcher": ".*", "command": "npx skill-loop-claude pre-hook" }],');
-      lines.push('    "PostToolUse": [{ "matcher": ".*", "command": "npx skill-loop-claude post-hook" }] } }');
+      lines.push('  { "hooks": { "PreToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "npx skill-loop-claude pre-hook" }] }],');
+      lines.push('    "PostToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "npx skill-loop-claude post-hook" }] }] } }');
       lines.push('Or run `npx skill-loop init` interactively to set this up.');
     } else if (hookStatus === 'outdated') {
       lines.push('', 'Hooks detected but using old "Skill" matcher. Update to ".*" for full auto-detection.');

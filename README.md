@@ -126,11 +126,11 @@ Or configure manually in `.claude/settings.json`:
   "hooks": {
     "PreToolUse": [{
       "matcher": ".*",
-      "command": "npx skill-loop-claude pre-hook"
+      "hooks": [{ "type": "command", "command": "npx skill-loop-claude pre-hook" }]
     }],
     "PostToolUse": [{
       "matcher": ".*",
-      "command": "npx skill-loop-claude post-hook"
+      "hooks": [{ "type": "command", "command": "npx skill-loop-claude post-hook" }]
     }]
   }
 }
