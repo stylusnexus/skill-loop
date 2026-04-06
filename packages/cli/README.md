@@ -49,7 +49,7 @@ Add to `.mcp.json` in your project root:
   "mcpServers": {
     "skill-loop": {
       "command": "npx",
-      "args": ["@stylusnexus/skill-loop-cli", "serve"]
+      "args": ["-y", "-p", "@stylusnexus/skill-loop-cli", "skill-loop-mcp"]
     }
   }
 }
@@ -91,7 +91,7 @@ Add to `~/.cursor/mcp.json`:
   "mcpServers": {
     "skill-loop": {
       "command": "npx",
-      "args": ["@stylusnexus/skill-loop-cli", "serve"]
+      "args": ["-y", "-p", "@stylusnexus/skill-loop-cli", "skill-loop-mcp"]
     }
   }
 }
@@ -106,7 +106,7 @@ Add to your Windsurf MCP config:
   "mcpServers": {
     "skill-loop": {
       "command": "npx",
-      "args": ["@stylusnexus/skill-loop-cli", "serve"]
+      "args": ["-y", "-p", "@stylusnexus/skill-loop-cli", "skill-loop-mcp"]
     }
   }
 }
@@ -117,7 +117,7 @@ Add to your Windsurf MCP config:
 ```json
 {
   "command": "npx",
-  "args": ["@stylusnexus/skill-loop-cli", "serve"]
+  "args": ["-y", "-p", "@stylusnexus/skill-loop-cli", "skill-loop-mcp"]
 }
 ```
 
