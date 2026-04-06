@@ -38,7 +38,7 @@ describe('RegistryManager', () => {
     const registry = await manager.scan(['.claude/skills']);
     expect(registry.skills).toHaveLength(2);
     expect(registry.skills.map(s => s.name).sort()).toEqual(['alpha', 'beta']);
-    expect(registry.schemaVersion).toBe(1);
+    expect(registry.schemaVersion).toBe(2);
   });
 
   it('assigns stable UUIDs that persist across rescans', async () => {

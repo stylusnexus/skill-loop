@@ -104,7 +104,7 @@ server.registerTool(
       }
 
       const registry = new RegistryManager(projectRoot, telemetryDir);
-      const result = await registry.scan(config.skillPaths);
+      const result = await registry.scan(config.skillPaths, config.globalSkillPaths);
 
       const lines = [`Scanned and registered ${result.skills.length} skills:`];
       for (const skill of result.skills) {
@@ -130,7 +130,7 @@ server.registerTool(
     if (['update', 'refresh', 'rescan', 're-scan'].some((k) => normalized.includes(k))) {
       // Same as scan but framed as an update
       const registry = new RegistryManager(projectRoot, telemetryDir);
-      const result = await registry.scan(config.skillPaths);
+      const result = await registry.scan(config.skillPaths, config.globalSkillPaths);
       return {
         content: [{ type: 'text' as const, text: `Registry updated: ${result.skills.length} skills registered.` }],
       };
@@ -606,7 +606,7 @@ server.registerTool(
     }
 
     const registry = new RegistryManager(projectRoot, telemetryDir);
-    const result = await registry.scan(config.skillPaths);
+    const result = await registry.scan(config.skillPaths, config.globalSkillPaths);
 
     const lines = [
       `Initialized skill-loop in ${config.telemetryDir}/`,
