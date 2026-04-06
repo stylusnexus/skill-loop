@@ -61,7 +61,36 @@ Add to `.mcp.json` in your project root:
 }
 ```
 
-Then ask Claude: **"Initialize skill-loop"** -- the MCP server handles everything from there.
+Then ask Claude: **"Initialize skill-loop"** and you'll see:
+
+```
+❯ Run skill-loop init
+
+⏺ skill-loop - skill_loop_init (MCP)
+
+⏺ Skill-loop initialized successfully. 27 skills registered in
+  .skill-telemetry/ with file and tool references indexed.
+
+  The output suggests adding pre/post hooks to .claude/settings.json
+  for auto-detection. Want me to set those up, or are you just
+  initializing the registry for now?
+```
+
+Say **"Yes, set those up"** and Claude configures the hooks automatically:
+
+```
+❯ Yes, set those up
+
+⏺ Update(.claude/settings.json)
+  Added skill-loop hooks:
+  - PreToolUse (.*): npx skill-loop-claude pre-hook
+  - PostToolUse (.*): npx skill-loop-claude post-hook
+
+⏺ Done. These will run on every tool invocation, enabling
+  skill-loop's auto-detection and telemetry collection.
+```
+
+From there, Claude can run `skill-loop status`, `skill-loop review`, or `skill-loop fix` conversationally.
 
 **Option B: Hooks (automatic observation)**
 
