@@ -10,6 +10,17 @@ SKILL --> RUN --> OBSERVE --> INSPECT --> FIX
   +---------------------------------------+
 ```
 
+## Which package do I need?
+
+This is the one. **Most users only need `@stylusnexus/skill-loop-cli`.**
+
+| Package | What it is | Who it's for |
+|---------|-----------|-------------|
+| **`@stylusnexus/skill-loop-cli`** (this package) | CLI + MCP server | **Most users.** Use skill-loop from the terminal or connect it to Claude Code, Cursor, Windsurf, or any MCP-compatible tool. |
+| [`@stylusnexus/skill-loop`](https://www.npmjs.com/package/@stylusnexus/skill-loop) | Core library | Developers building custom integrations or plugins on top of skill-loop. |
+
+This package includes the core library as a dependency, so you get everything in one install.
+
 ## Install
 
 ```bash

@@ -10,9 +10,16 @@ SKILL --> RUN --> OBSERVE --> INSPECT --> FIX
   +---------------------------------------+
 ```
 
-## When to use this package
+## Which package do I need?
 
-Use `@stylusnexus/skill-loop` if you're building a custom integration or plugin on top of skill-loop. If you just want to use skill-loop from the command line or as an MCP server, install [`@stylusnexus/skill-loop-cli`](https://www.npmjs.com/package/@stylusnexus/skill-loop-cli) instead -- it includes this package as a dependency.
+There are two skill-loop packages. You probably want the other one.
+
+| Package | What it is | Who it's for |
+|---------|-----------|-------------|
+| [`@stylusnexus/skill-loop-cli`](https://www.npmjs.com/package/@stylusnexus/skill-loop-cli) | CLI + MCP server | **Most users.** Install this to use skill-loop from the terminal or connect it to Claude Code, Cursor, Windsurf, or any MCP-compatible tool. |
+| **`@stylusnexus/skill-loop`** (this package) | Core library | Developers building custom integrations, plugins, or programmatic workflows on top of skill-loop. |
+
+**If you're not sure, install [`@stylusnexus/skill-loop-cli`](https://www.npmjs.com/package/@stylusnexus/skill-loop-cli)** -- it includes this package as a dependency, so you get everything.
 
 ## Install
 
