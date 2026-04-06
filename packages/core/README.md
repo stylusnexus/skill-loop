@@ -101,6 +101,30 @@ await logSkillRun({
 - Git operations are always local -- never pushes, never force-pushes
 - Amendments are created on isolated branches, never on your working branch
 
+## Troubleshooting
+
+### Import errors after updating
+
+Clear your build cache and rebuild:
+
+```bash
+npm run clean && npm run build
+```
+
+### `logSkillRun` returns null
+
+The skill name wasn't found in the registry. Run `skill-loop init` first to scan and register skills, then verify the name matches exactly.
+
+### Registry not finding all skills
+
+The registry scans both project-local and global paths. Pass `globalSkillPaths` to `scan()`:
+
+```typescript
+const config = await loadConfig(projectRoot);
+const registry = new RegistryManager(projectRoot, telemetryDir);
+await registry.scan(config.skillPaths, config.globalSkillPaths);
+```
+
 ## Full documentation
 
 See the [GitHub repository](https://github.com/stylusnexus/skill-loop) for complete documentation, configuration options, and CLI reference.

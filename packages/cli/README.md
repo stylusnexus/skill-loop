@@ -222,6 +222,49 @@ npx skill-loop --help
 | [`@stylusnexus/skill-loop-cli`](https://www.npmjs.com/package/@stylusnexus/skill-loop-cli) | This package -- CLI + MCP server |
 | [`@stylusnexus/skill-loop`](https://www.npmjs.com/package/@stylusnexus/skill-loop) | Core library for custom integrations |
 
+## Troubleshooting
+
+### "could not determine executable to run"
+
+Use the `-p` flag with npx for scoped packages:
+
+```bash
+npx -y -p @stylusnexus/skill-loop-cli skill-loop init
+```
+
+### MCP server not picking up new version
+
+npx caches packages. Re-run init to update the version-pinned `.mcp.json`:
+
+```bash
+npx -y -p @stylusnexus/skill-loop-cli@latest skill-loop init
+```
+
+Then `/mcp` reconnect in Claude Code.
+
+### "Invalid Settings" / hook format errors
+
+Re-run `skill-loop init` to write hooks in the correct format. Or manually use:
+
+```json
+{
+  "matcher": ".*",
+  "hooks": [{ "type": "command", "command": "npx skill-loop-claude pre-hook" }]
+}
+```
+
+### Only finding some skills
+
+Re-run `/sl scan` after updating. skill-loop scans both `~/.claude/skills/` and `~/.claude/agents/` (global) plus project-local `.claude/skills/`.
+
+### Hook errors on every tool call
+
+Run `skill-loop init` first to create `.skill-telemetry/`. Hooks fail silently if the telemetry directory doesn't exist.
+
+### `/skill-loop` triggers the wrong skill
+
+Use `/sl` instead. The `skill-loop` name collides with an existing `loop` skill in some setups.
+
 ## Full documentation
 
 See the [GitHub repository](https://github.com/stylusnexus/skill-loop) for complete documentation and configuration options.

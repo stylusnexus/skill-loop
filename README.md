@@ -387,6 +387,67 @@ It does **not** read your source code, environment variables, secrets, or any fi
 - Rollback uses `git revert` (creates a new commit) instead of destructive operations.
 - Amendment branches use a predictable naming convention (`skill-loop/amend-*`) so they're easy to identify and clean up.
 
+## Troubleshooting
+
+### "could not determine executable to run"
+
+npx can't resolve binaries from scoped package names directly. Use the `-p` flag:
+
+```bash
+# Wrong
+npx @stylusnexus/skill-loop-cli skill-loop init
+
+# Right
+npx -y -p @stylusnexus/skill-loop-cli skill-loop init
+```
+
+### MCP server not picking up new version
+
+npx caches packages aggressively. Pin the version to force a re-fetch:
+
+```bash
+npx -y -p @stylusnexus/skill-loop-cli@0.2.3 skill-loop init
+```
+
+Or re-run `skill-loop init` after updating -- it detects version mismatches in `.mcp.json` and offers to update.
+
+### "Invalid Settings" / hook format errors
+
+Claude Code hooks require the `{ matcher, hooks: [{ type, command }] }` format. If you configured hooks manually with the old format, update to:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": ".*",
+      "hooks": [{ "type": "command", "command": "npx skill-loop-claude pre-hook" }]
+    }],
+    "PostToolUse": [{
+      "matcher": ".*",
+      "hooks": [{ "type": "command", "command": "npx skill-loop-claude post-hook" }]
+    }]
+  }
+}
+```
+
+Or re-run `skill-loop init` to have it set up hooks correctly.
+
+### Only finding some skills (not all)
+
+skill-loop scans both project-local (`.claude/skills/`) and global (`~/.claude/skills/`, `~/.claude/agents/`) paths. If skills are missing:
+
+- Re-run `skill-loop init` or `/sl scan` to rescan
+- Check that the MCP server is running the latest version (see above)
+- Skills need either a `dir/SKILL.md` structure or a standalone `.md` file with YAML frontmatter
+
+### Hook errors on every tool call
+
+`PreToolUse:* hook error` messages usually mean the hooks are running but `.skill-telemetry/` hasn't been initialized. Run `skill-loop init` first.
+
+### `/skill-loop` triggers the wrong skill
+
+If you have a skill named `loop`, Claude may match `skill-loop` as `Skill(loop)`. Use `/sl` instead -- it's the official slash command and avoids this collision.
+
 ## License
 
 MIT
