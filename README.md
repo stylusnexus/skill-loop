@@ -12,7 +12,7 @@ SKILL --> RUN --> OBSERVE --> INSPECT --> FIX
 
 ## What it does
 
-1. **Observe** -- Automatically detects and logs skill usage via tiered confidence scoring — no explicit logging required
+1. **Observe** -- Automatically detects and logs skill usage via tiered confidence scoring -- no explicit logging required
 2. **Inspect** -- Detects failure patterns, staleness (dead file references), content drift, routing errors, and usage trends
 3. **Amend** -- Proposes targeted SKILL.md patches grounded in evidence from past runs
 4. **Evaluate** -- Tests amendments against recent failure cases on a git branch before any human sees a PR
@@ -20,22 +20,35 @@ SKILL --> RUN --> OBSERVE --> INSPECT --> FIX
 
 ## Packages
 
-| Package | Description |
-|---------|-------------|
-| `@stylusnexus/skill-loop` | Core engine (parser, registry, telemetry, inspector, amender) |
-| `@stylusnexus/skill-loop-cli` | CLI (`npx skill-loop <command>`) + MCP server (`serve`) |
-| `@stylusnexus/skill-loop-mcp` | MCP server (works with any MCP-compatible AI tool) |
-| `@stylusnexus/skill-loop-claude` | Claude Code adapter (PreToolUse/PostToolUse hooks) |
-| `@stylusnexus/skill-loop-codex` | OpenAI Codex adapter |
-| `@stylusnexus/skill-loop-copilot` | GitHub Copilot adapter |
+There are two packages. Most users only need the CLI.
 
-## Install
+| Package | What it is | When to use it |
+|---------|-----------|----------------|
+| [`@stylusnexus/skill-loop-cli`](https://www.npmjs.com/package/@stylusnexus/skill-loop-cli) | CLI + MCP server | **Most users.** Install this to use skill-loop from the command line or as an MCP server in any AI tool. |
+| [`@stylusnexus/skill-loop`](https://www.npmjs.com/package/@stylusnexus/skill-loop) | Core library | Building a custom integration or plugin on top of skill-loop. Not needed if you're using the CLI. |
 
-### Option 1: MCP Server (recommended — set it and forget it)
+`skill-loop-cli` depends on `skill-loop` (core), so installing the CLI gives you everything.
 
-Add one block to your MCP config. That's the only setup.
+## Quick start
 
-**Claude Code** (`.mcp.json` in your project root):
+```bash
+npm install -g @stylusnexus/skill-loop-cli
+```
+
+```bash
+skill-loop init     # Scans for skills, creates .skill-telemetry/
+skill-loop status   # Health dashboard
+skill-loop inspect  # Find problems
+skill-loop amend    # Auto-fix degraded skills
+```
+
+## Installation by tool
+
+### Claude Code
+
+**Option A: MCP server (recommended)**
+
+Add to `.mcp.json` in your project root:
 
 ```json
 {
@@ -48,100 +61,19 @@ Add one block to your MCP config. That's the only setup.
 }
 ```
 
-**Cursor** (`~/.cursor/mcp.json`):
+Then ask Claude: **"Initialize skill-loop"** -- the MCP server handles everything from there.
 
-```json
-{
-  "mcpServers": {
-    "skill-loop": {
-      "command": "npx",
-      "args": ["@stylusnexus/skill-loop-cli", "serve"]
-    }
-  }
-}
-```
+**Option B: Hooks (automatic observation)**
 
-Then ask your AI tool: **"Initialize skill-loop"**
-
-That's it. From that point forward:
-
-- The MCP server starts automatically when your AI tool launches
-- The agent can self-diagnose skill health, log runs, and propose fixes without you doing anything
-- No CLI commands to remember, no cron jobs to set up
-- Works with Claude Code, Cursor, Windsurf, and any MCP-compatible tool
-
-**Just talk to it.** The unified `skill_loop` tool understands natural language:
-
-| You say | What happens |
-|---------|-------------|
-| `skill-loop scan` | Scans your project for SKILL.md files and registers them |
-| `skill-loop status` | Shows health dashboard: skill count, runs, failure rate |
-| `skill-loop review` | Analyzes all skills for failure patterns, staleness, and trends |
-| `skill-loop fix` | Proposes amendments for broken skills (creates a git branch) |
-| `skill-loop fix --dry-run` | Preview fixes without modifying anything |
-| `skill-loop list` | Shows all registered skills with metadata |
-| `skill-loop runs` | Shows recent skill run activity |
-| `skill-loop history` | Lists past amendments and their status |
-| `skill-loop update` | Re-scans the skill registry after changes |
-| `skill-loop detection` | Shows detection stats and active sessions |
-| `skill-loop gc` | Prunes old run data |
-
-You can also use the individual MCP tools programmatically:
-
-| Tool | Description |
-|------|-------------|
-| `skill_loop_init` | Initialize: scan skills, create registry |
-| `skill_loop_status` | Health dashboard: skill count, run totals, failure rates |
-| `skill_loop_list` | List all registered skills with metadata and broken references |
-| `skill_loop_log` | Record a skill run outcome (success/failure/partial) |
-| `skill_loop_runs` | Query run history, filter by skill name or outcome |
-| `skill_loop_inspect` | Analyze run patterns, detect staleness, flag degrading skills |
-| `skill_loop_amend` | Propose and apply SKILL.md fixes (creates git branch, never modifies working branch) |
-| `skill_loop_evaluate` | Score an amendment against baseline and accept/reject |
-| `skill_loop_amendments` | List amendment history with status filter |
-
-### Option 2: CLI
-
-```bash
-npm install @stylusnexus/skill-loop @stylusnexus/skill-loop-cli
-```
-
-```bash
-# Initialize (scans for skills, creates .skill-telemetry/)
-npx skill-loop init
-
-# Check health
-npx skill-loop status
-
-# Manually log a run
-npx skill-loop log my-skill success
-
-# Run full inspection
-npx skill-loop inspect
-
-# Propose fixes for degraded skills
-npx skill-loop amend
-```
-
-### Option 3: Claude Code Hooks (automatic observation)
-
-For automatic skill run tracking in Claude Code, install the adapter:
-
-```bash
-npm install @stylusnexus/skill-loop @stylusnexus/skill-loop-claude
-```
-
-Then run init — it will offer to configure hooks for you:
+For automatic skill run tracking, run init and say yes when it offers to configure hooks:
 
 ```bash
 npx skill-loop init
-# ...
 # Auto-detection hooks are not configured.
-# These hooks observe tool calls and automatically log skill usage.
 # Add auto-detection hooks to .claude/settings.json? [Y/n]
 ```
 
-Say yes and it adds the hooks to `.claude/settings.json` automatically. If you prefer to set them up manually:
+Or configure manually in `.claude/settings.json`:
 
 ```json
 {
@@ -158,9 +90,98 @@ Say yes and it adds the hooks to `.claude/settings.json` automatically. If you p
 }
 ```
 
-The hooks observe all tool calls and auto-detect skill usage via tiered confidence scoring — no explicit `Skill` tool invocation required. Runs are logged to `.skill-telemetry/runs.jsonl` (gitignored, local-only). No data leaves your machine unless you configure a sync plugin.
+The hooks auto-detect skill usage via confidence scoring -- no explicit `Skill` tool call required.
 
-If you previously had hooks with `"matcher": "Skill"`, running `npx skill-loop init` again will detect the old config and offer to upgrade to `".*"` for full auto-detection.
+### Cursor
+
+Add to `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "skill-loop": {
+      "command": "npx",
+      "args": ["@stylusnexus/skill-loop-cli", "serve"]
+    }
+  }
+}
+```
+
+### Windsurf
+
+Add to your Windsurf MCP config:
+
+```json
+{
+  "mcpServers": {
+    "skill-loop": {
+      "command": "npx",
+      "args": ["@stylusnexus/skill-loop-cli", "serve"]
+    }
+  }
+}
+```
+
+### Any MCP-compatible tool
+
+The MCP server works with any tool that supports the Model Context Protocol. The config is always the same:
+
+```json
+{
+  "command": "npx",
+  "args": ["@stylusnexus/skill-loop-cli", "serve"]
+}
+```
+
+### Codex / Copilot (programmatic)
+
+For tools without MCP support, use the core library directly:
+
+```bash
+npm install @stylusnexus/skill-loop
+```
+
+```typescript
+import { logSkillRun } from '@stylusnexus/skill-loop';
+
+await logSkillRun({
+  skillName: 'my-skill',
+  platform: 'codex',  // or 'copilot'
+  outcome: 'success',
+  taskContext: 'refactor auth module',
+});
+```
+
+## MCP server commands
+
+Once configured, talk to skill-loop in natural language:
+
+| You say | What happens |
+|---------|-------------|
+| `skill-loop scan` | Scans your project for SKILL.md files and registers them |
+| `skill-loop status` | Shows health dashboard: skill count, runs, failure rate |
+| `skill-loop review` | Analyzes all skills for failure patterns, staleness, and trends |
+| `skill-loop fix` | Proposes amendments for broken skills (creates a git branch) |
+| `skill-loop fix --dry-run` | Preview fixes without modifying anything |
+| `skill-loop list` | Shows all registered skills with metadata |
+| `skill-loop runs` | Shows recent skill run activity |
+| `skill-loop history` | Lists past amendments and their status |
+| `skill-loop detection` | Shows detection stats and active sessions |
+| `skill-loop gc` | Prunes old run data |
+
+Individual MCP tools are also available for programmatic use:
+
+| Tool | Description |
+|------|-------------|
+| `skill_loop_init` | Initialize: scan skills, create registry |
+| `skill_loop_status` | Health dashboard: skill count, run totals, failure rates |
+| `skill_loop_list` | List all registered skills with metadata and broken references |
+| `skill_loop_log` | Record a skill run outcome (success/failure/partial) |
+| `skill_loop_runs` | Query run history, filter by skill name or outcome |
+| `skill_loop_inspect` | Analyze run patterns, detect staleness, flag degrading skills |
+| `skill_loop_amend` | Propose and apply SKILL.md fixes (creates git branch, never modifies working branch) |
+| `skill_loop_evaluate` | Score an amendment against baseline and accept/reject |
+| `skill_loop_amendments` | List amendment history with status filter |
 
 ## How it works
 
@@ -185,24 +206,7 @@ skill-loop auto-detects skill usage via a tiered confidence scoring system. Ever
 | Tool call matches `triggerPatterns` + `referencedTools` | 0.6 | Tool usage fingerprint matches a registered skill |
 | Files touched overlap `referencedFiles` | 0.5 | Reserved for future use |
 
-Runs are only logged when composite confidence exceeds a configurable threshold (default: 0.6). Each run record includes detection metadata:
-
-```json
-{
-  "id": "a1b2c3d4-...",
-  "skillId": "e5f6g7h8-...",
-  "skillVersion": 1,
-  "timestamp": "2026-03-24T12:00:00Z",
-  "platform": "claude",
-  "outcome": "success",
-  "durationMs": 1234,
-  "taskContext": "refactor auth module",
-  "detectionMethod": "read_skill_file",
-  "detectionConfidence": 0.9
-}
-```
-
-A compact index (`runs-index.json`) is maintained alongside for fast queries.
+Runs are only logged when composite confidence exceeds a configurable threshold (default: 0.6).
 
 ### 3. Detect problems
 
@@ -210,7 +214,7 @@ The inspector analyzes run history to find:
 - Skills with high failure rates
 - Skills that get selected for wrong tasks (negative feedback)
 - Stale references to files/tools that no longer exist
-- **Content drift** — referenced directories have changed significantly since the skill was last modified, suggesting the skill's domain knowledge may be outdated
+- **Content drift** -- referenced directories have changed significantly since the skill was last modified, suggesting the skill's domain knowledge may be outdated
 - Dead skills with zero recent invocations
 
 ### 4. Fix automatically
@@ -257,11 +261,10 @@ Create `skill-loop.config.json` in your project root (all fields optional):
 | `detection.confidenceWeights` | `{ explicit: 1.0, read_skill_file: 0.9, tool_fingerprint: 0.6, file_overlap: 0.5 }` | Confidence per method |
 | `detection.logBelowThreshold` | `false` | Log sub-threshold detections to `runs-debug.jsonl` for tuning |
 
-## CLI Reference
+## CLI reference
 
 ```bash
-npx skill-loop --help    # Show available commands
-npx skill-loop <command> # Run a command
+npx skill-loop --help
 ```
 
 | Command | Description |
@@ -297,15 +300,9 @@ Safe to delete: cache files, sync queue. Loses history: runs, amendments.
 ## Architecture
 
 ```
-@stylusnexus/skill-loop              (core engine - pure TS, zero runtime deps)
-+-- @stylusnexus/skill-loop-mcp      (MCP server - any MCP client)
-+-- @stylusnexus/skill-loop-claude    (Claude Code hooks)
-+-- @stylusnexus/skill-loop-cli       (CLI commands)
-+-- @stylusnexus/skill-loop-codex     (OpenAI Codex)
-+-- @stylusnexus/skill-loop-copilot   (GitHub Copilot)
+@stylusnexus/skill-loop        (core engine + adapters - pure TS, zero runtime deps)
+└── @stylusnexus/skill-loop-cli (CLI + MCP server - the "install and go" package)
 ```
-
-See [docs/design.md](docs/design.md) for the full design document.
 
 ## Security
 
@@ -336,53 +333,6 @@ It does **not** read your source code, environment variables, secrets, or any fi
 - Files in `.skill-telemetry/` (run logs, registry, cache, reports)
 - SKILL.md files **only during amendments** (on a new git branch, never on your working branch)
 - `.gitignore` (adds `.skill-telemetry/` entry during `init`)
-
-### Permissions and the amend tool
-
-The `skill_loop_amend` MCP tool and `npx skill-loop amend` CLI command **modify SKILL.md files** by:
-
-1. Creating a new git branch (`skill-loop/amend-<name>-<hash>`)
-2. Writing the amended SKILL.md on that branch
-3. Committing the change
-4. Switching back to your original branch
-
-**Your working branch is never modified.** Amendments live on isolated branches until you review and merge them.
-
-When using the MCP server, your AI tool's permission system governs whether `skill_loop_amend` can execute:
-- **Claude Code**: Prompts you for approval in `default` permission mode
-- **Cursor/Windsurf**: Uses their built-in tool approval flow
-- **`--dry-run`**: Always available to preview proposals without any file changes
-
-### Sync plugins and data privacy
-
-Future sync plugins may send run data to external services (PostHog, etc.). The core enforces privacy at the code level — this is not left to plugin authors:
-
-**Sensitive fields are redacted by the core before plugins ever see them:**
-
-| Field | Contains | Default | How to allow |
-|-------|----------|---------|--------------|
-| `taskContext` | What the user was doing | `[redacted]` | `sync.allowSensitiveFields: true` |
-| `errorDetail` | Error messages from skill failures | `[redacted]` | `sync.allowSensitiveFields: true` |
-
-The core's `sanitizeRunForSync()` function strips these fields before passing data to any plugin. Plugins receive a `SanitizedSkillRun` type — they physically cannot access the raw data unless you opt in.
-
-To explicitly allow sensitive fields (e.g., for a private PostHog instance):
-
-```json
-{
-  "sync": {
-    "plugins": ["posthog"],
-    "allowSensitiveFields": true
-  }
-}
-```
-
-**Additional safeguards:**
-
-- Sync is **opt-in** — disabled by default, no plugins configured
-- The core engine never touches the network — only plugins do
-- Sync is fire-and-forget and never blocks the local feedback loop
-- Non-sensitive fields (skill ID, outcome, duration, platform, tags) are always available to plugins — these are sufficient for most analytics
 
 ### Git safety
 

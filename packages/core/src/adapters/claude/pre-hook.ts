@@ -1,14 +1,15 @@
 import { join } from 'node:path';
-import { DetectionPipeline, loadConfig } from '@stylusnexus/skill-loop';
-import type { PostEvent } from '@stylusnexus/skill-loop';
+import { DetectionPipeline } from '../../detector.js';
+import { loadConfig } from '../../config.js';
+import type { PreEvent } from '../../detector.js';
 
-export async function postHook(): Promise<void> {
+export async function preHook(): Promise<void> {
   const input = await readStdin();
   if (!input) return;
 
-  let hookOutput: { tool_name: string; tool_input?: Record<string, unknown>; tool_result?: unknown; tool_error?: string; session_id?: string };
+  let hookInput: { tool_name: string; tool_input: Record<string, unknown>; session_id?: string };
   try {
-    hookOutput = JSON.parse(input);
+    hookInput = JSON.parse(input);
   } catch {
     return;
   }
@@ -17,16 +18,14 @@ export async function postHook(): Promise<void> {
   const config = await loadConfig(projectRoot);
   const telemetryDir = join(projectRoot, config.telemetryDir);
 
-  const event: PostEvent = {
-    tool_name: hookOutput.tool_name,
-    tool_input: hookOutput.tool_input,
-    tool_result: hookOutput.tool_result,
-    tool_error: hookOutput.tool_error,
-    session_id: hookOutput.session_id,
+  const event: PreEvent = {
+    tool_name: hookInput.tool_name,
+    tool_input: hookInput.tool_input ?? {},
+    session_id: hookInput.session_id,
   };
 
   const pipeline = new DetectionPipeline(projectRoot, telemetryDir, config.detection);
-  await pipeline.handlePostEvent(event);
+  await pipeline.handlePreEvent(event);
 }
 
 function readStdin(): Promise<string> {

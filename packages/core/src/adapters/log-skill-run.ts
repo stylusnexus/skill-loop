@@ -1,28 +1,13 @@
-/**
- * Copilot adapter for skill-loop.
- *
- * GitHub Copilot uses custom instructions for configuration. This adapter
- * provides a helper function that Copilot extensions or workflows can call
- * to log skill execution outcomes.
- *
- * Usage:
- *
- *   import { logSkillRun } from '@stylusnexus/skill-loop-copilot';
- *
- *   await logSkillRun({
- *     skillName: 'my-skill',
- *     outcome: 'success',
- *     taskContext: 'fix login bug',
- *   });
- */
-
-import { TelemetryWriter, loadConfig, readJson } from '@stylusnexus/skill-loop';
-import type { SkillRun, SkillRegistry, RunOutcome } from '@stylusnexus/skill-loop';
+import { TelemetryWriter } from '../telemetry.js';
+import { loadConfig } from '../config.js';
+import { readJson } from '../storage.js';
+import type { SkillRun, SkillRegistry, RunOutcome, Platform } from '../types.js';
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 
 export interface LogSkillRunOptions {
   skillName: string;
+  platform: Platform;
   outcome: RunOutcome;
   taskContext?: string;
   taskTags?: string[];
@@ -32,7 +17,7 @@ export interface LogSkillRunOptions {
 }
 
 /**
- * Log a skill run from a Copilot workflow or extension.
+ * Log a skill run from any platform adapter.
  * Resolves the skill from the registry and appends to runs.jsonl.
  */
 export async function logSkillRun(options: LogSkillRunOptions): Promise<string | null> {
@@ -50,7 +35,7 @@ export async function logSkillRun(options: LogSkillRunOptions): Promise<string |
     skillId: skill.id,
     skillVersion: skill.version,
     timestamp: new Date().toISOString(),
-    platform: 'copilot',
+    platform: options.platform,
     taskContext: (options.taskContext ?? '').slice(0, 200),
     taskTags: options.taskTags ?? [],
     outcome: options.outcome,

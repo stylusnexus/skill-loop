@@ -8,6 +8,6 @@
  *   { "command": "node", "args": ["path/to/cli/dist/index.js", "serve"] }
  */
 export async function serveCommand(): Promise<void> {
-  const { startMcpServer } = await import('@stylusnexus/skill-loop-mcp');
+  const { startMcpServer } = await import('../mcp-server.js');
   await startMcpServer();
 }
