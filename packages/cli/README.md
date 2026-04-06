@@ -27,11 +27,26 @@ This package includes the core library as a dependency, so you get everything in
 npm install -g @stylusnexus/skill-loop-cli
 ```
 
-## Quick start
+Then **initialize** -- this is required before anything else works:
 
 ```bash
-skill-loop init     # Scan for skills, create .skill-telemetry/
-skill-loop status   # Health dashboard
+skill-loop init
+```
+
+This scans for skills, creates `.skill-telemetry/`, offers to configure Claude Code hooks, and installs the `/sl` slash command.
+
+## Quick start
+
+Once initialized, use the `/sl` slash command or CLI directly:
+
+```bash
+/sl status          # Health dashboard (slash command)
+/sl review          # Inspect for problems
+/sl fix             # Auto-fix degraded skills
+```
+
+```bash
+skill-loop status   # Same thing from the CLI
 skill-loop inspect  # Find problems
 skill-loop amend    # Auto-fix degraded skills
 ```
