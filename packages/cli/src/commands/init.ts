@@ -23,8 +23,12 @@ export async function initCommand(projectRoot: string): Promise<void> {
   }
 
   const registry = new RegistryManager(projectRoot, telemetryDir);
-  const result = await registry.scan(config.skillPaths);
-  console.log(`Registered ${result.skills.length} skills from ${config.skillPaths.join(', ')}`);
+  const result = await registry.scan(config.skillPaths, config.globalSkillPaths);
+  const localCount = result.skills.filter(s => s.source === 'local').length;
+  const installedCount = result.skills.filter(s => s.source === 'installed').length;
+  const globalCount = result.skills.filter(s => s.scope === 'global').length;
+  const projectCount = result.skills.filter(s => s.scope === 'project').length;
+  console.log(`Registered ${result.skills.length} skills (${localCount} local, ${installedCount} installed | ${projectCount} project, ${globalCount} global)`);
 
   for (const skill of result.skills) {
     console.log(`  ${skill.type === 'agent' ? 'agent' : 'skill'}: ${skill.name} (${skill.referencedFiles.length} file refs, ${skill.referencedTools.length} tool refs)`);

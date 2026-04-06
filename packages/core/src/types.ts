@@ -32,7 +32,14 @@ export interface SkillRecord {
   lastModified: string;
   /** ISO timestamp of last staleness check */
   lastVerifiedAt: string;
+  /** Where this skill came from: local (user-authored) or installed (from registry). Defaults to 'local'. */
+  source?: SkillSource;
+  /** Whether this skill was found in a global path (~/.claude/) vs project-local. Defaults to 'project'. */
+  scope?: SkillScope;
 }
+
+export type SkillSource = 'local' | 'installed';
+export type SkillScope = 'global' | 'project';
 
 // ─── Run Log ──────────────────────────────────────────────────────
 
@@ -255,6 +262,8 @@ export interface DetectionConfig {
 export interface SkillLoopConfig {
   schemaVersion: number;
   skillPaths: string[];
+  /** Absolute paths to scan for global skills (default: ~/.claude/skills, ~/.claude/agents) */
+  globalSkillPaths: string[];
   telemetryDir: string;
   thresholds: {
     failureRateAlert: number;

@@ -25,6 +25,8 @@ export interface FlaggedSkill {
   skillName: string;
   reasons: string[];
   severity: 'low' | 'medium' | 'high';
+  source?: 'local' | 'installed';
+  scope?: 'global' | 'project';
 }
 
 export class Inspector {
@@ -40,9 +42,9 @@ export class Inspector {
 
   /**
    * Run full inspection: compute patterns, detect staleness, flag issues.
-   * Optionally filter to a single skill by name.
+   * Optionally filter by skill name, source, or scope.
    */
-  async inspect(skillName?: string): Promise<InspectResult> {
+  async inspect(skillName?: string, options?: { source?: 'local' | 'installed'; scope?: 'global' | 'project' }): Promise<InspectResult> {
     const registry = await readJson<SkillRegistry>(join(this.telemetryDir, 'registry.json'));
     if (!registry || registry.skills.length === 0) {
       return { timestamp: new Date().toISOString(), skillCount: 0, totalRuns: 0, patterns: [], flagged: [] };
@@ -59,6 +61,12 @@ export class Inspector {
     let skills = registry.skills;
     if (skillName) {
       skills = skills.filter(s => s.name === skillName);
+    }
+    if (options?.source) {
+      skills = skills.filter(s => s.source === options.source);
+    }
+    if (options?.scope) {
+      skills = skills.filter(s => s.scope === options.scope);
     }
 
     const patterns: SkillPattern[] = [];
@@ -150,7 +158,7 @@ export class Inspector {
           failureRate >= this.config.thresholds.failureRateAlert || stalenessScore > 0.5 ? 'medium' :
           driftScore >= 10 ? 'medium' :
           'low';
-        flagged.push({ skillId: skill.id, skillName: skill.name, reasons, severity });
+        flagged.push({ skillId: skill.id, skillName: skill.name, reasons, severity, source: skill.source, scope: skill.scope });
       }
     }
 

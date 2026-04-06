@@ -1,10 +1,15 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import type { SkillLoopConfig } from './types.js';
 
 export const DEFAULT_CONFIG: SkillLoopConfig = {
   schemaVersion: 1,
   skillPaths: ['.claude/skills', '.claude/agents'],
+  globalSkillPaths: [
+    join(homedir(), '.claude', 'skills'),
+    join(homedir(), '.claude', 'agents'),
+  ],
   telemetryDir: '.skill-telemetry',
   thresholds: {
     failureRateAlert: 0.2,
