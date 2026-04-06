@@ -24,4 +24,5 @@ skill-loop.code-workspace
 docs
 CLAUDE.md
 .claude/auto-memory/*
+.claude/settings.local.json
 docs/*
