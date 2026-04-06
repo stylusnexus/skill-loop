@@ -1000,9 +1000,8 @@ export async function startMcpServer(): Promise<void> {
   await server.connect(transport);
 }
 
-// Auto-start when run directly (not imported)
-const isDirectRun = process.argv[1]?.endsWith('index.js') &&
-  !process.argv[1]?.includes('cli');
+// Auto-start when run as binary (not imported by serve command)
+const isDirectRun = process.argv[1]?.endsWith('mcp-server.js');
 
 if (isDirectRun) {
   startMcpServer().catch((err) => {

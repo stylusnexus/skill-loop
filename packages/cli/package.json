@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "description": "CLI for skill-loop: inspect, amend, evaluate, and maintain AI coding tool skills",
   "bin": {
-    "skill-loop": "dist/index.js"
+    "skill-loop": "dist/index.js",
+    "skill-loop-mcp": "dist/mcp-server.js"
   },
   "files": ["dist"],
   "scripts": {
@@ -14,7 +15,8 @@
   },
   "dependencies": {
     "@stylusnexus/skill-loop": "*",
-    "@stylusnexus/skill-loop-mcp": "*"
+    "@modelcontextprotocol/sdk": "^1.27.0",
+    "zod": "^3.24.0"
   },
   "license": "MIT",
   "repository": {

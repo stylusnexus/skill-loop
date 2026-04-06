@@ -20,3 +20,6 @@ export { loadPlugins } from './plugin-loader.js';
 export type { PluginLoadResult } from './plugin-loader.js';
 export { DetectionPipeline, scoreDetection, listSessions, computeDetectionStats, dryRunDetect } from './detector.js';
 export type { PreEvent, PostEvent, DetectionStats } from './detector.js';
+export { preHook, postHook } from './adapters/claude/index.js';
+export { logSkillRun } from './adapters/log-skill-run.js';
+export type { LogSkillRunOptions } from './adapters/log-skill-run.js';
