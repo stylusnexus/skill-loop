@@ -6,7 +6,7 @@
     "skill-loop": "dist/index.js",
     "skill-loop-mcp": "dist/mcp-server.js"
   },
-  "files": ["dist"],
+  "files": ["dist", "skills"],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",

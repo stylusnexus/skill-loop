@@ -1,6 +1,7 @@
 import { RegistryManager, loadConfig } from '@stylusnexus/skill-loop';
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, copyFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { homedir } from 'node:os';
 import { createInterface } from 'node:readline';
 
 export async function initCommand(projectRoot: string): Promise<void> {
@@ -37,7 +38,10 @@ export async function initCommand(projectRoot: string): Promise<void> {
   // Offer to configure Claude Code hooks for auto-detection
   await offerHookSetup(projectRoot);
 
-  console.log('\nskill-loop initialized. Run `npx skill-loop status` to check health.');
+  // Install /sl slash command skill
+  await installSlSkill();
+
+  console.log('\nskill-loop initialized. Run `npx skill-loop status` or `/sl status` to check health.');
 }
 
 async function offerHookSetup(projectRoot: string): Promise<void> {
@@ -112,6 +116,38 @@ async function offerHookSetup(projectRoot: string): Promise<void> {
   await mkdir(join(projectRoot, '.claude'), { recursive: true });
   await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
   console.log('Added auto-detection hooks to .claude/settings.json');
+}
+
+async function installSlSkill(): Promise<void> {
+  const destDir = join(homedir(), '.claude', 'skills', 'sl');
+  const destFile = join(destDir, 'SKILL.md');
+
+  // Check if already installed
+  try {
+    await stat(destFile);
+    console.log('\n/sl slash command already installed.');
+    return;
+  } catch { /* not installed yet */ }
+
+  // Find the bundled SKILL.md relative to this compiled file
+  const srcFile = join(__dirname, '..', '..', 'skills', 'sl', 'SKILL.md');
+
+  try {
+    await stat(srcFile);
+  } catch {
+    // Bundled skill not found (running from source or different layout)
+    return;
+  }
+
+  const answer = await ask('\nInstall /sl slash command for Claude Code? [Y/n] ');
+  if (answer.toLowerCase() === 'n') {
+    console.log('Skipped. You can use the skill_loop MCP tool directly.');
+    return;
+  }
+
+  await mkdir(destDir, { recursive: true });
+  await copyFile(srcFile, destFile);
+  console.log('Installed /sl slash command to ~/.claude/skills/sl/');
 }
 
 function ask(question: string): Promise<string> {
