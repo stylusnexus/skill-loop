@@ -35,6 +35,9 @@ export async function initCommand(projectRoot: string): Promise<void> {
     console.log(`  ${skill.type === 'agent' ? 'agent' : 'skill'}: ${skill.name} (${skill.referencedFiles.length} file refs, ${skill.referencedTools.length} tool refs)`);
   }
 
+  // Offer to configure MCP server in .mcp.json
+  await offerMcpSetup(projectRoot);
+
   // Offer to configure Claude Code hooks for auto-detection
   await offerHookSetup(projectRoot);
 
@@ -42,6 +45,70 @@ export async function initCommand(projectRoot: string): Promise<void> {
   await installSlSkill();
 
   console.log('\nskill-loop initialized. Run `npx skill-loop status` or `/sl status` to check health.');
+}
+
+async function offerMcpSetup(projectRoot: string): Promise<void> {
+  const mcpPath = join(projectRoot, '.mcp.json');
+
+  // Read package version for pinning
+  let version = 'latest';
+  try {
+    const pkgRaw = await readFile(join(__dirname, '..', '..', 'package.json'), 'utf-8');
+    version = JSON.parse(pkgRaw).version || 'latest';
+  } catch { /* fallback to latest */ }
+
+  const pkgSpec = version === 'latest'
+    ? '@stylusnexus/skill-loop-cli'
+    : `@stylusnexus/skill-loop-cli@${version}`;
+
+  let mcpConfig: Record<string, any> = {};
+  try {
+    const raw = await readFile(mcpPath, 'utf-8');
+    mcpConfig = JSON.parse(raw);
+  } catch { /* no .mcp.json yet */ }
+
+  const servers = mcpConfig.mcpServers ?? {};
+  const existing = servers['skill-loop'];
+
+  if (existing) {
+    // Check if version-pinned and up to date
+    const args: string[] = existing.args ?? [];
+    const currentPkg = args.find((a: string) => a.includes('@stylusnexus/skill-loop-cli'));
+    if (currentPkg === pkgSpec) {
+      console.log(`\nMCP server already configured (${pkgSpec}).`);
+      return;
+    }
+
+    // Update to pinned version
+    const answer = await ask(`\nUpdate MCP server config to ${pkgSpec}? [Y/n] `);
+    if (answer.toLowerCase() === 'n') return;
+
+    servers['skill-loop'] = {
+      command: 'npx',
+      args: ['-y', '-p', pkgSpec, 'skill-loop-mcp'],
+    };
+    mcpConfig.mcpServers = servers;
+    await writeFile(mcpPath, JSON.stringify(mcpConfig, null, 2) + '\n');
+    console.log(`Updated .mcp.json to ${pkgSpec}. Restart Claude Code or run /mcp to reconnect.`);
+    return;
+  }
+
+  // No MCP server configured — offer to add
+  console.log('\nMCP server is not configured for this project.');
+  const answer = await ask(`Add skill-loop MCP server to .mcp.json? [Y/n] `);
+  if (answer.toLowerCase() === 'n') {
+    console.log('Skipped. You can still use the CLI directly.');
+    return;
+  }
+
+  if (!mcpConfig.mcpServers) mcpConfig.mcpServers = {};
+  mcpConfig.mcpServers['skill-loop'] = {
+    command: 'npx',
+    args: ['-y', '-p', pkgSpec, 'skill-loop-mcp'],
+  };
+  await writeFile(mcpPath, JSON.stringify(mcpConfig, null, 2) + '\n');
+  console.log(`Added skill-loop MCP server to .mcp.json (${pkgSpec}).`);
+  console.log('Restart Claude Code or run /mcp to connect.');
 }
 
 async function offerHookSetup(projectRoot: string): Promise<void> {
