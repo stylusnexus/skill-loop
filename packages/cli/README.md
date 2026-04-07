@@ -165,20 +165,33 @@ Add to your Windsurf MCP config:
 }
 ```
 
-## MCP server commands
+## Commands
 
-Once configured, talk to skill-loop in natural language:
+Use `/sl` (slash command) or talk to skill-loop naturally:
 
-| You say | What happens |
+| Command | What happens |
 |---------|-------------|
-| `skill-loop scan` | Scans for SKILL.md files and registers them |
-| `skill-loop status` | Health dashboard: skill count, runs, failure rate |
-| `skill-loop review` | Analyzes skills for failure patterns and staleness |
-| `skill-loop fix` | Proposes amendments for broken skills |
-| `skill-loop fix --dry-run` | Preview fixes without modifying anything |
-| `skill-loop list` | Shows all registered skills |
-| `skill-loop runs` | Shows recent skill run activity |
-| `skill-loop detection` | Shows detection stats and active sessions |
+| `/sl scan` | Scans for SKILL.md files and registers them |
+| `/sl status` | Health dashboard: skill count, runs, failure rate |
+| `/sl review` | Analyzes skills for failure patterns and staleness |
+| `/sl fix` | Proposes fixes -- you pick which to apply |
+| `/sl rollback <name>` | Undo a fix by restoring from backup |
+| `/sl list` | Shows all registered skills (local vs installed) |
+| `/sl runs` | Shows recent skill run activity |
+| `/sl history` | Lists past amendments and their status |
+| `/sl detection` | Shows detection stats and active sessions |
+| `/sl gc` | Prune old run data |
+
+### Fix workflow
+
+`/sl fix` uses a two-phase conversational flow:
+
+1. **Diagnose** -- shows flagged skills with severity and proposed changes (no files modified)
+2. **Apply** -- you pick which fixes to apply ("all", specific names, or "none")
+3. Fixes are written directly to SKILL.md files with automatic backups
+4. **Rollback** -- undo any fix with `/sl rollback <name>`
+
+No git branches, no commands to memorize. Works in Claude Code, Claude.ai, Cursor, Codex, Copilot.
 
 ## CLI reference
 
@@ -188,13 +201,13 @@ npx skill-loop --help
 
 | Command | Description |
 |---------|-------------|
-| `init` | Scan for skills, create `.skill-telemetry/`, update `.gitignore` |
+| `init` | Scan for skills, configure MCP + hooks + `/sl` skill |
 | `status` | Health dashboard (skill count, run totals, failure rate) |
 | `log <skill> <outcome>` | Manually log a skill run |
 | `inspect` | Full analysis with pattern detection and staleness scoring |
-| `amend` | Generate amendments for flagged skills |
+| `amend` | Generate amendments for flagged skills (branch mode) |
 | `evaluate <id>` | Test a proposed amendment against recent failures |
-| `rollback <id>` | Revert a merged amendment via `git revert` |
+| `rollback <id>` | Revert a merged amendment |
 | `gc` | Prune runs older than configured retention |
 | `sessions` | Show active detection sessions |
 | `detect <tool> [k=v]` | Dry-run detection against a hypothetical tool call |

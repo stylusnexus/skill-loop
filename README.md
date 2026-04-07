@@ -198,24 +198,55 @@ await logSkillRun({
 });
 ```
 
-## MCP server commands
+## Commands
 
-Once configured, talk to skill-loop in natural language:
+Use the `/sl` slash command or talk to skill-loop in natural language:
 
-| You say | What happens |
+| Command | What happens |
 |---------|-------------|
-| `skill-loop scan` | Scans your project for SKILL.md files and registers them |
-| `skill-loop status` | Shows health dashboard: skill count, runs, failure rate |
-| `skill-loop review` | Analyzes all skills for failure patterns, staleness, and trends |
-| `skill-loop fix` | Proposes amendments for broken skills (creates a git branch) |
-| `skill-loop fix --dry-run` | Preview fixes without modifying anything |
-| `skill-loop list` | Shows all registered skills with metadata |
-| `skill-loop runs` | Shows recent skill run activity |
-| `skill-loop history` | Lists past amendments and their status |
-| `skill-loop detection` | Shows detection stats and active sessions |
-| `skill-loop gc` | Prunes old run data |
+| `/sl scan` | Scans for SKILL.md files and registers them |
+| `/sl status` | Health dashboard: skill count, runs, failure rate |
+| `/sl review` | Analyzes skills for failure patterns, staleness, and trends |
+| `/sl fix` | Proposes fixes -- shows a summary, you pick which to apply |
+| `/sl rollback <name>` | Undo a fix by restoring from backup |
+| `/sl list` | Shows all registered skills with source (local/installed) |
+| `/sl runs` | Shows recent skill run activity |
+| `/sl history` | Lists past amendments and their status |
+| `/sl detection` | Shows detection stats and active sessions |
+| `/sl gc` | Prunes old run data |
 
-Individual MCP tools are also available for programmatic use:
+### Fix workflow
+
+The fix command uses a two-phase conversational flow that works across all AI tools:
+
+**Phase 1 -- Diagnose (read-only):**
+```
+/sl fix
+
+Found 3 skills that need fixes:
+
+  [HIGH] deploy-aws — 2 broken file references (67% failure rate)
+  [MED]  test-runner — high failure rate (45%)
+  [LOW]  lint-config — 1 broken reference
+
+Apply all, specific ones, or see details first?
+```
+
+**Phase 2 -- Apply (you choose):**
+- "Apply all" -- fixes all proposed skills in-place
+- "Fix deploy-aws and test-runner" -- fixes only those two
+- "Show me the deploy-aws diff" -- see full diff before deciding
+- "Skip" -- no changes made
+
+Fixes are applied directly to SKILL.md files with automatic backups. No git branches, no commands to remember. To undo any fix:
+
+```
+/sl rollback deploy-aws
+```
+
+### Individual MCP tools
+
+For programmatic use, individual tools are also available:
 
 | Tool | Description |
 |------|-------------|
@@ -225,7 +256,7 @@ Individual MCP tools are also available for programmatic use:
 | `skill_loop_log` | Record a skill run outcome (success/failure/partial) |
 | `skill_loop_runs` | Query run history, filter by skill name or outcome |
 | `skill_loop_inspect` | Analyze run patterns, detect staleness, flag degrading skills |
-| `skill_loop_amend` | Propose and apply SKILL.md fixes (creates git branch, never modifies working branch) |
+| `skill_loop_amend` | Propose SKILL.md fixes (legacy branch mode) |
 | `skill_loop_evaluate` | Score an amendment against baseline and accept/reject |
 | `skill_loop_amendments` | List amendment history with status filter |
 
@@ -263,14 +294,15 @@ The inspector analyzes run history to find:
 - **Content drift** -- referenced directories have changed significantly since the skill was last modified, suggesting the skill's domain knowledge may be outdated
 - Dead skills with zero recent invocations
 
-### 4. Fix automatically
+### 4. Fix conversationally
 
-When a pattern is detected, the amender:
-1. Drafts a targeted SKILL.md patch (fix broken references, tighten triggers, add failure context, or flag content drift)
-2. Creates a git branch
-3. Evaluates the amendment against recent failures
-4. Opens a PR with evaluation results if it improves things
-5. You review and merge (or it auto-rolls back if things get worse)
+When problems are detected, `/sl fix` shows you what's wrong and proposes fixes:
+1. Shows a summary of flagged skills with severity and proposed changes
+2. You pick which to apply (all, specific ones, or none)
+3. Approved fixes are written directly to SKILL.md files with automatic backups
+4. You can undo any fix with `/sl rollback <name>`
+
+No git branches, no commands to memorize. Works in Claude Code, Claude.ai, Cursor, Codex, Copilot -- anywhere skill-loop's MCP server runs.
 
 ## Configuration
 
