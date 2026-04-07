@@ -15,16 +15,12 @@ Requires Node.js >= 18.
 
 ## Monorepo Structure
 
-skill-loop is a Turborepo monorepo with the following packages:
+skill-loop is a Turborepo monorepo with two packages:
 
-| Package | Description |
-|---------|-------------|
-| `packages/core` | Core library — skill storage, evaluation, amendment, telemetry |
-| `packages/cli` | CLI tool for managing skills from the terminal |
-| `packages/mcp-server` | MCP server that exposes skill-loop to AI coding tools |
-| `packages/adapter-claude` | Adapter for Claude Code |
-| `packages/adapter-codex` | Adapter for OpenAI Codex |
-| `packages/adapter-copilot` | Adapter for GitHub Copilot |
+| Package        | Description                                                                                                              |
+|----------------|------------------------------------------------------------------------------------------------------------------------------|
+| `packages/core` | Core engine — parser, registry, detection, telemetry, inspector, amender, evaluator, adapters. Zero runtime dependencies. |
+| `packages/cli`  | CLI commands + MCP server. Imports core. This is the package most users install.                                           |
 
 ## Running Tests
 
@@ -66,15 +62,16 @@ npx tsc
 
 We use [Conventional Commits](https://www.conventionalcommits.org/). Format:
 
-```
+```text
 type(scope): description
 ```
 
 Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `perf`, `ci`
 
 Examples:
+
 - `feat(core): add skill versioning support`
-- `fix(mcp-server): handle missing skill gracefully`
+- `fix(mcp): handle missing skill gracefully`
 - `docs: update CONTRIBUTING.md`
 
 ### PR Checklist
@@ -89,7 +86,7 @@ Before submitting a pull request:
 
 ## Reporting Security Issues
 
-If you discover a security vulnerability, please **do not** open a public issue. Instead, email **security@stylusnexus.com** with details. We will respond within 48 hours.
+If you discover a security vulnerability, please **do not** open a public issue. Instead, email **<security@stylusnexus.com>** with details. We will respond within 48 hours.
 
 ## Code of Conduct
 
