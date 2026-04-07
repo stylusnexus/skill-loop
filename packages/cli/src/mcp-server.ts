@@ -233,11 +233,8 @@ server.registerTool(
       }
 
       lines.push('---');
-      lines.push('To apply fixes, call skill_loop with action: "apply-fixes" and include proposalIds (array of IDs above).');
-      lines.push('Options: apply all, specific IDs, or filter by severity ("apply-fixes --severity high").');
-      lines.push('To see a full diff for any proposal, ask me to show the diff for a specific skill name.');
-      lines.push('');
-      lines.push('IMPORTANT: Present the proposals above as a summary list. Ask the user which to apply: "all", specific skill names, or "none". Then call skill_loop with action "apply-fixes" and the selected proposalIds.');
+      lines.push('To apply: use skill_loop_apply_fixes with proposalIds (array of IDs above), or severity/changeType filter.');
+      lines.push('To rollback: use skill_loop_rollback with the skill name.');
 
       return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
     }
@@ -1063,6 +1060,113 @@ server.registerTool(
         { type: 'text' as const, text: JSON.stringify(output, null, 2) },
       ],
     };
+  }
+);
+
+// ─── Tool: skill_loop_apply_fixes ─────────────────────────────────
+
+server.registerTool(
+  'skill_loop_apply_fixes',
+  {
+    title: 'Apply Skill Fixes',
+    description:
+      'Apply previously proposed skill fixes in-place. Run skill_loop with action "fix" first to generate proposals, then use this tool to apply selected ones. Creates backups before modifying files. Use proposalIds to apply specific fixes, or severity/changeType filters for bulk apply.',
+    inputSchema: z.object({
+      proposalIds: z
+        .array(z.string())
+        .optional()
+        .describe('Array of proposal IDs to apply (e.g., ["prop-a1b2c3d4"]). Omit to apply all pending proposals.'),
+      severity: z
+        .enum(['high', 'medium', 'low'])
+        .optional()
+        .describe('Apply only proposals matching this severity level'),
+      changeType: z
+        .string()
+        .optional()
+        .describe('Apply only proposals matching this change type (reference, content_drift, trigger, instruction)'),
+    }),
+  },
+  async ({ proposalIds, severity, changeType }) => {
+    const projectRoot = getProjectRoot();
+    const config = await loadConfig(projectRoot);
+    const telemetryDir = join(projectRoot, config.telemetryDir);
+
+    try {
+      await stat(telemetryDir);
+    } catch {
+      return {
+        content: [{ type: 'text' as const, text: 'skill-loop is not initialized. Run skill_loop_init first.' }],
+      };
+    }
+
+    const amender = new Amender(projectRoot, telemetryDir, config);
+
+    const filter: { severity?: string; changeType?: string } = {};
+    if (severity) filter.severity = severity;
+    if (changeType) filter.changeType = changeType;
+
+    const result = await amender.applyFixes({
+      proposalIds: proposalIds ?? undefined,
+      filter: Object.keys(filter).length > 0 ? filter : undefined,
+    });
+
+    if (result.applied.length === 0 && result.failed.length === 0) {
+      return {
+        content: [{ type: 'text' as const, text: 'No pending proposals found. Run skill_loop with action "fix" first to generate proposals.' }],
+      };
+    }
+
+    const lines: string[] = [];
+    if (result.applied.length > 0) {
+      lines.push(`Applied ${result.applied.length} fix(es):`);
+      for (const a of result.applied) {
+        lines.push(`  ${a.skillName} — ${a.changeType}`);
+      }
+    }
+    if (result.failed.length > 0) {
+      lines.push(`\nFailed (${result.failed.length}):`);
+      for (const f of result.failed) {
+        lines.push(`  ${f.skillName}: ${f.reason}`);
+      }
+    }
+    if (result.rollbackHint) {
+      lines.push(`\n${result.rollbackHint}`);
+    }
+    return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+  }
+);
+
+// ─── Tool: skill_loop_rollback ────────────────────────────────────
+
+server.registerTool(
+  'skill_loop_rollback',
+  {
+    title: 'Rollback Skill Fix',
+    description:
+      'Undo an in-place skill fix by restoring the original SKILL.md from backup. Use this when a fix made things worse or was applied incorrectly.',
+    inputSchema: z.object({
+      skillName: z
+        .string()
+        .describe('Name of the skill to rollback (e.g., "deploy-aws")'),
+    }),
+  },
+  async ({ skillName }) => {
+    const projectRoot = getProjectRoot();
+    const config = await loadConfig(projectRoot);
+    const telemetryDir = join(projectRoot, config.telemetryDir);
+
+    try {
+      await stat(telemetryDir);
+    } catch {
+      return {
+        content: [{ type: 'text' as const, text: 'skill-loop is not initialized. Run skill_loop_init first.' }],
+      };
+    }
+
+    const amender = new Amender(projectRoot, telemetryDir, config);
+    const result = await amender.rollback(skillName);
+
+    return { content: [{ type: 'text' as const, text: result.message }] };
   }
 );
 
