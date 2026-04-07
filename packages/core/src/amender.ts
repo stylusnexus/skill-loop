@@ -25,7 +25,7 @@ import {
 const AMENDMENTS_FILE = 'amendments.jsonl';
 const PROPOSALS_DIR = '.proposals';
 const BACKUPS_DIR = 'backups';
-const PROPOSAL_TTL_MS = 60 * 60 * 1000; // 1 hour
+const PROPOSAL_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
 export interface AmendmentProposal {
   id: string;

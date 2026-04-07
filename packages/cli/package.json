@@ -1,6 +1,6 @@
 {
   "name": "@stylusnexus/skill-loop-cli",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "CLI for skill-loop: inspect, amend, evaluate, and maintain AI coding tool skills",
   "bin": {
     "skill-loop": "dist/index.js",
