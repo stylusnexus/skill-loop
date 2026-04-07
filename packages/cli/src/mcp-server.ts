@@ -211,23 +211,96 @@ server.registerTool(
         return { content: [{ type: 'text' as const, text: 'No skills flagged. All healthy.' }] };
       }
 
+      // Phase 1: Diagnose only — return proposals for user review
       const amender = new Amender(projectRoot, telemetryDir, config);
-      const result = await amender.amend(inspection.flagged, dryRun ?? false);
+      const result = await amender.diagnose(inspection.flagged);
+
+      const lines: string[] = [
+        `Found ${result.summary.totalFlagged} skill(s) that need fixes:`,
+        '',
+      ];
+
+      for (const p of result.proposals) {
+        lines.push(`[${p.severity.toUpperCase()}] ${p.skillName} — ${p.reason}`);
+        lines.push(`  Fix: ${p.diffSummary}`);
+        lines.push(`  ID: ${p.id}`);
+        lines.push('');
+      }
+
+      if (result.skipped.length > 0) {
+        lines.push(`Skipped: ${result.skipped.join(', ')}`);
+        lines.push('');
+      }
+
+      lines.push('---');
+      lines.push('To apply fixes, call skill_loop with action: "apply-fixes" and include proposalIds (array of IDs above).');
+      lines.push('Options: apply all, specific IDs, or filter by severity ("apply-fixes --severity high").');
+      lines.push('To see a full diff for any proposal, ask me to show the diff for a specific skill name.');
+      lines.push('');
+      lines.push('IMPORTANT: Present the proposals above as a summary list. Ask the user which to apply: "all", specific skill names, or "none". Then call skill_loop with action "apply-fixes" and the selected proposalIds.');
+
+      return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+    }
+
+    // Phase 2: Apply selected fixes in-place
+    if (['apply-fixes', 'apply fixes', 'apply'].some((k) => normalized.includes(k))) {
+      try { await stat(telemetryDir); } catch {
+        return { content: [{ type: 'text' as const, text: 'Not initialized. Run with action: "scan" first.' }] };
+      }
+
+      const amender = new Amender(projectRoot, telemetryDir, config);
+
+      // Parse proposalIds from the action string or use filter
+      let proposalIds: string[] | undefined;
+      let filter: { severity?: string } | undefined;
+
+      // Check if specific IDs were passed (e.g., "apply-fixes prop-a1b2c3d4 prop-e5f6g7h8")
+      const idMatches = normalized.match(/prop-[a-f0-9]+/g);
+      if (idMatches) {
+        proposalIds = idMatches;
+      }
+      // Check for severity filter (e.g., "apply-fixes --severity high")
+      const severityMatch = normalized.match(/(?:severity|sev)\s+(high|medium|low)/);
+      if (severityMatch) {
+        filter = { severity: severityMatch[1] };
+      }
+
+      const result = await amender.applyFixes({ proposalIds, filter });
 
       const lines: string[] = [];
-      if (dryRun) lines.push('DRY RUN — no changes made\n');
-      if (result.proposals.length > 0) {
-        lines.push(`Proposals (${result.proposals.length}):`);
-        for (const p of result.proposals) lines.push(`  ${p.skillName} (${p.changeType}): ${p.reason}`);
-      }
       if (result.applied.length > 0) {
-        lines.push(`\nApplied (${result.applied.length}):`);
-        for (const a of result.applied) lines.push(`  ${a.id.slice(0, 8)} on branch ${a.branchName}`);
+        lines.push(`Applied ${result.applied.length} fix(es):`);
+        for (const a of result.applied) {
+          lines.push(`  ${a.skillName} — ${a.changeType}`);
+        }
       }
-      if (result.skipped.length > 0) {
-        lines.push(`\nSkipped: ${result.skipped.join(', ')}`);
+      if (result.failed.length > 0) {
+        lines.push(`\nFailed (${result.failed.length}):`);
+        for (const f of result.failed) {
+          lines.push(`  ${f.skillName}: ${f.reason}`);
+        }
+      }
+      if (result.rollbackHint) {
+        lines.push(`\n${result.rollbackHint}`);
       }
       return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+    }
+
+    // Rollback an in-place fix
+    if (['rollback', 'undo', 'revert'].some((k) => normalized.includes(k))) {
+      try { await stat(telemetryDir); } catch {
+        return { content: [{ type: 'text' as const, text: 'Not initialized. Run with action: "scan" first.' }] };
+      }
+
+      const amender = new Amender(projectRoot, telemetryDir, config);
+      const targetSkill = skillName || normalized.replace(/rollback|undo|revert/g, '').trim();
+
+      if (!targetSkill) {
+        return { content: [{ type: 'text' as const, text: 'Specify which skill to rollback. Example: action "rollback", skillName "deploy-aws"' }] };
+      }
+
+      const result = await amender.rollback(targetSkill);
+      return { content: [{ type: 'text' as const, text: result.message }] };
     }
 
     if (['history', 'amendments', 'changes', 'log'].some((k) => normalized.includes(k))) {

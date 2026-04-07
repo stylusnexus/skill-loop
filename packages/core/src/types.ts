@@ -154,8 +154,12 @@ export interface Amendment {
   baselineScore?: number;
   /** How many runs in the evaluation */
   evaluationRunCount?: number;
-  /** Git branch for the PR */
+  /** Git branch for the PR (branch mode only) */
   branchName?: string;
+  /** Path to backup of original file (in-place mode) */
+  backupPath?: string;
+  /** How this amendment was applied */
+  applyMode?: 'in-place' | 'branch';
   /** ISO timestamp when accepted/merged */
   appliedAt?: string;
   /** skill-loop engine version that applied it */
