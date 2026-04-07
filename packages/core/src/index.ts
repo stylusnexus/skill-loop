@@ -7,7 +7,7 @@ export { TelemetryWriter } from './telemetry.js';
 export { Inspector } from './inspector.js';
 export type { InspectResult, FlaggedSkill } from './inspector.js';
 export { Amender } from './amender.js';
-export type { AmendmentProposal, AmendResult } from './amender.js';
+export type { AmendmentProposal, AmendResult, DiagnoseResult, ApplyResult } from './amender.js';
 export { Evaluator } from './evaluator.js';
 export type { EvaluationResult } from './evaluator.js';
 export { createUnifiedDiff } from './diff.js';
