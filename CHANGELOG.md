@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.3] - 2026-04-09
+
+### Fixed
+- `npx skill-loop-claude` E404 error for installed users — hook commands now use `--package=@stylusnexus/skill-loop` so npx resolves the scoped binary correctly
+
 ## [0.3.2] - 2026-04-06
 
 ### Added
