@@ -113,7 +113,7 @@ async function offerMcpSetup(projectRoot: string): Promise<void> {
 
 async function offerHookSetup(projectRoot: string): Promise<void> {
   const settingsPath = join(projectRoot, '.claude', 'settings.json');
-  const hookCommand = 'npx skill-loop-claude';
+  const hookCommand = 'npx --package=@stylusnexus/skill-loop skill-loop-claude';
 
   let settings: Record<string, any> = {};
   let hasExistingSettings = false;

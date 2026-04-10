@@ -120,8 +120,8 @@ server.registerTool(
       if (hookStatus === 'missing') {
         lines.push('', 'Auto-detection hooks are not configured. To enable automatic skill run tracking,');
         lines.push('add to .claude/settings.json:');
-        lines.push('  { "hooks": { "PreToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "npx skill-loop-claude pre-hook" }] }],');
-        lines.push('    "PostToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "npx skill-loop-claude post-hook" }] }] } }');
+        lines.push('  { "hooks": { "PreToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook" }] }],');
+        lines.push('    "PostToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "npx --package=@stylusnexus/skill-loop skill-loop-claude post-hook" }] }] } }');
         lines.push('Or run `npx skill-loop init` interactively to set this up.');
       } else if (hookStatus === 'outdated') {
         lines.push('', 'Auto-detection hooks use the old "Skill" matcher. Update matcher to ".*" in .claude/settings.json for full auto-detection.');
@@ -695,8 +695,8 @@ server.registerTool(
     const hookStatus = await checkHookStatus(projectRoot);
     if (hookStatus === 'missing') {
       lines.push('', 'To enable auto-detection, add hooks to .claude/settings.json:');
-      lines.push('  { "hooks": { "PreToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "npx skill-loop-claude pre-hook" }] }],');
-      lines.push('    "PostToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "npx skill-loop-claude post-hook" }] }] } }');
+      lines.push('  { "hooks": { "PreToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook" }] }],');
+      lines.push('    "PostToolUse": [{ "matcher": ".*", "hooks": [{ "type": "command", "command": "npx --package=@stylusnexus/skill-loop skill-loop-claude post-hook" }] }] } }');
       lines.push('Or run `npx skill-loop init` interactively to set this up.');
     } else if (hookStatus === 'outdated') {
       lines.push('', 'Hooks detected but using old "Skill" matcher. Update to ".*" for full auto-detection.');

@@ -100,8 +100,8 @@ Say **"Yes, set those up"** and Claude configures the hooks automatically:
 
 ⏺ Update(.claude/settings.json)
   Added skill-loop hooks:
-  - PreToolUse (.*): npx skill-loop-claude pre-hook
-  - PostToolUse (.*): npx skill-loop-claude post-hook
+  - PreToolUse (.*): npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook
+  - PostToolUse (.*): npx --package=@stylusnexus/skill-loop skill-loop-claude post-hook
 
 ⏺ Done. These will run on every tool invocation, enabling
   skill-loop's auto-detection and telemetry collection.
@@ -126,11 +126,11 @@ Or configure manually in `.claude/settings.json`:
   "hooks": {
     "PreToolUse": [{
       "matcher": ".*",
-      "hooks": [{ "type": "command", "command": "npx skill-loop-claude pre-hook" }]
+      "hooks": [{ "type": "command", "command": "npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook" }]
     }],
     "PostToolUse": [{
       "matcher": ".*",
-      "hooks": [{ "type": "command", "command": "npx skill-loop-claude post-hook" }]
+      "hooks": [{ "type": "command", "command": "npx --package=@stylusnexus/skill-loop skill-loop-claude post-hook" }]
     }]
   }
 }
@@ -452,11 +452,11 @@ Claude Code hooks require the `{ matcher, hooks: [{ type, command }] }` format. 
   "hooks": {
     "PreToolUse": [{
       "matcher": ".*",
-      "hooks": [{ "type": "command", "command": "npx skill-loop-claude pre-hook" }]
+      "hooks": [{ "type": "command", "command": "npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook" }]
     }],
     "PostToolUse": [{
       "matcher": ".*",
-      "hooks": [{ "type": "command", "command": "npx skill-loop-claude post-hook" }]
+      "hooks": [{ "type": "command", "command": "npx --package=@stylusnexus/skill-loop skill-loop-claude post-hook" }]
     }]
   }
 }
