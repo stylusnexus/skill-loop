@@ -1,4 +1,4 @@
-import { RegistryManager, loadConfig } from '@stylusnexus/skill-loop';
+import { RegistryManager, loadConfig, claudeHookCommand } from '@stylusnexus/skill-loop';
 import { readFile, writeFile, mkdir, copyFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -113,7 +113,6 @@ async function offerMcpSetup(projectRoot: string): Promise<void> {
 
 async function offerHookSetup(projectRoot: string): Promise<void> {
   const settingsPath = join(projectRoot, '.claude', 'settings.json');
-  const hookCommand = 'npx --package=@stylusnexus/skill-loop skill-loop-claude';
 
   let settings: Record<string, any> = {};
   let hasExistingSettings = false;
@@ -140,7 +139,21 @@ async function offerHookSetup(projectRoot: string): Promise<void> {
   const hasPostHook = !!findHookEntry(postHooks);
 
   if (hasPreHook && hasPostHook) {
-    console.log('\nClaude Code hooks already configured for auto-detection.');
+    const upgraded = structuredClone(settings);
+    const changed = upgradeHookCommands(upgraded.hooks.PreToolUse, 'pre-hook')
+      + upgradeHookCommands(upgraded.hooks.PostToolUse, 'post-hook');
+    if (changed === 0) {
+      console.log('\nClaude Code hooks already configured for auto-detection.');
+      return;
+    }
+    console.log('\nClaude Code hooks start skill-loop-claude through npx on every tool call.');
+    const upgradeAnswer = await ask('Update them to use an installed skill-loop-claude when available? [Y/n] ');
+    if (upgradeAnswer.toLowerCase() === 'n') {
+      console.log('Skipped. Existing hooks left unchanged.');
+      return;
+    }
+    await writeFile(settingsPath, JSON.stringify(upgraded, null, 2) + '\n');
+    console.log(`Updated ${changed} hook command(s) in .claude/settings.json`);
     return;
   }
 
@@ -160,16 +173,34 @@ async function offerHookSetup(projectRoot: string): Promise<void> {
 
   settings.hooks.PreToolUse.push({
     matcher: '.*',
-    hooks: [{ type: 'command', command: `${hookCommand} pre-hook` }],
+    hooks: [{ type: 'command', command: claudeHookCommand('pre-hook') }],
   });
   settings.hooks.PostToolUse.push({
     matcher: '.*',
-    hooks: [{ type: 'command', command: `${hookCommand} post-hook` }],
+    hooks: [{ type: 'command', command: claudeHookCommand('post-hook') }],
   });
 
   await mkdir(join(projectRoot, '.claude'), { recursive: true });
   await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n');
   console.log('Added auto-detection hooks to .claude/settings.json');
+}
+
+// Rewrites older skill-loop-claude hook commands (bare npx, pinned versions) in
+// place, so re-running init moves existing projects off per-call npx startup.
+export function upgradeHookCommands(entries: any[], event: 'pre-hook' | 'post-hook'): number {
+  const current = claudeHookCommand(event);
+  let changed = 0;
+  const upgrade = (h: any) => {
+    if (typeof h?.command === 'string' && h.command.includes('skill-loop-claude') && h.command !== current) {
+      h.command = current;
+      changed++;
+    }
+  };
+  for (const entry of entries) {
+    upgrade(entry);
+    if (Array.isArray(entry?.hooks)) entry.hooks.forEach(upgrade);
+  }
+  return changed;
 }
 
 async function installSlSkill(): Promise<void> {
