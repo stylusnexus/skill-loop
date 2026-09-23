@@ -9,7 +9,12 @@ describe('upgradeHookCommands', () => {
       { matcher: '.*', hooks: [{ type: 'command', command: 'npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook' }] },
     ];
 
-    expect(upgradeHookCommands(entries, 'pre-hook')).toBe(2);
+    const changes = upgradeHookCommands(entries, 'pre-hook');
+
+    expect(changes.map((c) => c.from)).toEqual([
+      'npx -y -p @stylusnexus/skill-loop-cli@0.2.4 skill-loop-claude pre-hook',
+      'npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook',
+    ]);
     expect(entries.map((e) => e.hooks[0].command)).toEqual([
       claudeHookCommand('pre-hook'),
       claudeHookCommand('pre-hook'),
@@ -22,14 +27,14 @@ describe('upgradeHookCommands', () => {
       { hooks: [{ type: 'command', command: 'python3 other-hook.py' }] },
     ];
 
-    expect(upgradeHookCommands(entries, 'post-hook')).toBe(0);
+    expect(upgradeHookCommands(entries, 'post-hook')).toEqual([]);
     expect(entries[1].hooks[0].command).toBe('python3 other-hook.py');
   });
 
   it('rewrites a flat legacy entry that carries the command directly', () => {
     const entries = [{ matcher: 'Skill', command: 'npx skill-loop-claude pre-hook' }];
 
-    expect(upgradeHookCommands(entries, 'pre-hook')).toBe(1);
+    expect(upgradeHookCommands(entries, 'pre-hook')).toHaveLength(1);
     expect(entries[0].command).toBe(claudeHookCommand('pre-hook'));
   });
 });

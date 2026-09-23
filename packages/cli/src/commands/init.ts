@@ -140,20 +140,23 @@ async function offerHookSetup(projectRoot: string): Promise<void> {
 
   if (hasPreHook && hasPostHook) {
     const upgraded = structuredClone(settings);
-    const changed = upgradeHookCommands(upgraded.hooks.PreToolUse, 'pre-hook')
-      + upgradeHookCommands(upgraded.hooks.PostToolUse, 'post-hook');
-    if (changed === 0) {
+    const changes = [
+      ...upgradeHookCommands(upgraded.hooks.PreToolUse, 'pre-hook'),
+      ...upgradeHookCommands(upgraded.hooks.PostToolUse, 'post-hook'),
+    ];
+    if (changes.length === 0) {
       console.log('\nClaude Code hooks already configured for auto-detection.');
       return;
     }
-    console.log('\nClaude Code hooks start skill-loop-claude through npx on every tool call.');
+    console.log('\nThese hook commands differ from the current skill-loop hook command:');
+    for (const { from, to } of changes) console.log(`  - ${from}\n  + ${to}`);
     const upgradeAnswer = await ask('Update them to use an installed skill-loop-claude when available? [Y/n] ');
     if (upgradeAnswer.toLowerCase() === 'n') {
       console.log('Skipped. Existing hooks left unchanged.');
       return;
     }
     await writeFile(settingsPath, JSON.stringify(upgraded, null, 2) + '\n');
-    console.log(`Updated ${changed} hook command(s) in .claude/settings.json`);
+    console.log(`Updated ${changes.length} hook command(s) in .claude/settings.json`);
     return;
   }
 
@@ -187,20 +190,23 @@ async function offerHookSetup(projectRoot: string): Promise<void> {
 
 // Rewrites older skill-loop-claude hook commands (bare npx, pinned versions) in
 // place, so re-running init moves existing projects off per-call npx startup.
-export function upgradeHookCommands(entries: any[], event: 'pre-hook' | 'post-hook'): number {
+export function upgradeHookCommands(
+  entries: any[],
+  event: 'pre-hook' | 'post-hook',
+): Array<{ from: string; to: string }> {
   const current = claudeHookCommand(event);
-  let changed = 0;
+  const changes: Array<{ from: string; to: string }> = [];
   const upgrade = (h: any) => {
     if (typeof h?.command === 'string' && h.command.includes('skill-loop-claude') && h.command !== current) {
+      changes.push({ from: h.command, to: current });
       h.command = current;
-      changed++;
     }
   };
   for (const entry of entries) {
     upgrade(entry);
     if (Array.isArray(entry?.hooks)) entry.hooks.forEach(upgrade);
   }
-  return changed;
+  return changes;
 }
 
 async function installSlSkill(): Promise<void> {
