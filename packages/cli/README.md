@@ -92,8 +92,8 @@ Say **"Yes, set those up"** and Claude configures the hooks automatically:
 
 ⏺ Update(.claude/settings.json)
   Added skill-loop hooks:
-  - PreToolUse (.*): npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook
-  - PostToolUse (.*): npx --package=@stylusnexus/skill-loop skill-loop-claude post-hook
+  - PreToolUse (.*): if command -v skill-loop-claude >/dev/null 2>&1; then skill-loop-claude pre-hook; else npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook; fi
+  - PostToolUse (.*): if command -v skill-loop-claude >/dev/null 2>&1; then skill-loop-claude post-hook; else npx --package=@stylusnexus/skill-loop skill-loop-claude post-hook; fi
 
 ⏺ Done. These will run on every tool invocation, enabling
   skill-loop's auto-detection and telemetry collection.
@@ -116,15 +116,17 @@ Or configure manually in `.claude/settings.json`:
   "hooks": {
     "PreToolUse": [{
       "matcher": ".*",
-      "hooks": [{ "type": "command", "command": "npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook" }]
+      "hooks": [{ "type": "command", "command": "if command -v skill-loop-claude >/dev/null 2>&1; then skill-loop-claude pre-hook; else npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook; fi" }]
     }],
     "PostToolUse": [{
       "matcher": ".*",
-      "hooks": [{ "type": "command", "command": "npx --package=@stylusnexus/skill-loop skill-loop-claude post-hook" }]
+      "hooks": [{ "type": "command", "command": "if command -v skill-loop-claude >/dev/null 2>&1; then skill-loop-claude post-hook; else npx --package=@stylusnexus/skill-loop skill-loop-claude post-hook; fi" }]
     }]
   }
 }
 ```
+
+Hooks run on every tool call. Install the core package globally (`npm i -g @stylusnexus/skill-loop`) and the hook runs `skill-loop-claude` directly (~0.05s) instead of resolving it through npx (~0.35s) each time; without a global install it falls back to npx. Re-running `skill-loop init` offers to update older npx-only hook commands.
 
 ### Cursor
 
@@ -262,7 +264,7 @@ Re-run `skill-loop init` to write hooks in the correct format. Or manually use:
 ```json
 {
   "matcher": ".*",
-  "hooks": [{ "type": "command", "command": "npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook" }]
+  "hooks": [{ "type": "command", "command": "if command -v skill-loop-claude >/dev/null 2>&1; then skill-loop-claude pre-hook; else npx --package=@stylusnexus/skill-loop skill-loop-claude pre-hook; fi" }]
 }
 ```
 
